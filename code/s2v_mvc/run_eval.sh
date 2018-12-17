@@ -13,7 +13,8 @@ max_bp_iter=5
 embed_dim=64
 
 # gpu card id
-dev_id=3
+# dev_id=3
+dev_id=0
 
 # max batch size for training/testing
 batch_size=64
@@ -30,15 +31,19 @@ learning_rate=0.0001
 w_scale=0.01
 
 # nstep
-n_step=5
+# n_step=5
+n_step=2
 
 min_n=15
 max_n=20
 
-num_env=10
+# num_env=10
+num_env=1
+
 mem_size=500000
 
 max_iter=100000
+
 
 # folder to save the trained model
 save_dir=$result_root/embed-$embed_dim-nbp-$max_bp_iter-rh-$reg_hidden

@@ -1,3 +1,16 @@
+# Set True only if debugging in vscode, using debug configuration "s2v_mvc main.py"
+VSCODE_DEBUG_MODE = True 
+if VSCODE_DEBUG_MODE:
+    import ptvsd
+    # port=3000
+    # ptvsd.enable_attach(secret='my_secret', address =('127.0.0.1', port))
+    # ptvsd.wait_for_attach()
+    # 5678 is the default attach port in the VS Code debug configurations
+    print("Waiting for debugger attach")
+    ptvsd.enable_attach(address=('localhost', 5678), redirect_output=True)
+    ptvsd.wait_for_attach()
+    breakpoint()
+
 import numpy as np
 import networkx as nx
 import cPickle as cp
@@ -10,7 +23,11 @@ from tqdm import tqdm
 
 sys.path.append( '%s/mvc_lib' % os.path.dirname(os.path.realpath(__file__)) )
 from mvc_lib import MvcLib
-    
+import sys
+sys.path.append("/home/daniela/PycharmProjects/cplex-samples")
+from mipex1_mvc import CplexMvcSolver
+# from mipex1_mvc import CplexMvcSolver
+
 def find_model_file(opt):
     max_n = int(opt['max_n'])
     min_n = int(opt['min_n'])
@@ -50,7 +67,9 @@ if __name__ == '__main__':
 
     test_name = opt['data_test'].split('/')[-1]
     result_file = '%s/test-%s-gnn-%s-%s.csv' % (opt['save_dir'], test_name, opt['min_n'], opt['max_n'])
-
+    ref_cplex_val = []
+    ref_cplex_sol = []
+    ref_cplex_val_sum = 0
     with open(result_file, 'w') as f_out:
         print 'testing'
         sys.stdout.flush()
@@ -66,4 +85,12 @@ if __name__ == '__main__':
                 f_out.write(' %d' % sol[i + 1])
             f_out.write(',%.6f\n' % (t2 - t1))
             frac += val
+            # Compute cplex solution:
+            cplex_mvc_solver = CplexMvcSolver(g)
+            cplex_val, cplex_sol = cplex_mvc_solver.solve()
+            ref_cplex_sol.append(cplex_sol)
+            ref_cplex_val.append(cplex_val)
+            ref_cplex_val_sum += cplex_val
     print 'average size of vc: ', frac / n_test
+    print 'average size of cplex vc: ', ref_cplex_val_sum / n_test
+    print 'approximation ratio s2v/cplex: ', frac / ref_cplex_val_sum

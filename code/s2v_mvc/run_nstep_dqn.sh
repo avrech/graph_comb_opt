@@ -30,13 +30,13 @@ w_scale=0.01
 # nstep
 n_step=2
 
-min_n=15
-max_n=20
+min_n=50
+max_n=100
 
 num_env=1
 mem_size=500000
 
-max_iter=1000000
+max_iter=100000
 
 # folder to save the trained model
 save_dir=$result_root/embed-$embed_dim-nbp-$max_bp_iter-rh-$reg_hidden

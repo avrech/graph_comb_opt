@@ -1,3 +1,16 @@
+# Set True only if debugging in vscode, using debug configuration "s2v_mvc main.py"
+VSCODE_DEBUG_MODE = False 
+if VSCODE_DEBUG_MODE:
+    import ptvsd
+    # port=3000
+    # ptvsd.enable_attach(secret='my_secret', address =('127.0.0.1', port))
+    # ptvsd.wait_for_attach()
+    # 5678 is the default attach port in the VS Code debug configurations
+    print("Waiting for debugger attach")
+    ptvsd.enable_attach(address=('localhost', 5678), redirect_output=True)
+    ptvsd.wait_for_attach()
+    breakpoint()
+
 import numpy as np
 import networkx as nx
 import cPickle as cp
