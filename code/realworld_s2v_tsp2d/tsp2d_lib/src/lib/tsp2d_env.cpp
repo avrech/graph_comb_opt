@@ -4,11 +4,19 @@
 #include <random>
 #include <iostream>
 
+#include <fstream> // avrech
+#include <sstream> // 
+#include <iterator>
+using namespace std;
+
 int sign = 1;
 
-Tsp2dEnv::Tsp2dEnv(double _norm) : IEnv(_norm)
+Tsp2dEnv::Tsp2dEnv(double _norm, const string record_filename) : IEnv(_norm)
 {
-
+    rec_filename = record_filename; // avrech
+    if( remove( "myfile.txt" ) == 0 )
+        puts("Over-writing record_file");
+    
 }
 
 void Tsp2dEnv::s0(std::shared_ptr<Graph> _g)
@@ -86,6 +94,14 @@ double Tsp2dEnv::add_node(int new_node)
     assert(cur_dist >= -1e-8);
     action_list.insert(action_list.begin() + pos + 1, new_node);
     partial_set.insert(new_node);
+    
+    // avrech - Print here the partial tour to a file. 
+    std::stringstream result;
+    std::copy(action_list.begin(), action_list.end(), std::ostream_iterator<int>(result, " "));
+    std::ofstream myfile;
+    myfile.open (rec_filename, std::ios_base::app);
+    myfile << result.str() << endl;
+    myfile.close();
 
     return sign * cur_dist / norm;
 }

@@ -56,8 +56,8 @@ int Init(const int argc, const char** argv)
     
     Simulator::Init(cfg::num_env);
     for (int i = 0; i < cfg::num_env; ++i)
-        Simulator::env_list[i] = new Tsp2dEnv(cfg::max_n);
-    test_env = new Tsp2dEnv(cfg::max_n);
+        Simulator::env_list[i] = new Tsp2dEnv(cfg::max_n, "rec_file.txt");
+    test_env = new Tsp2dEnv(cfg::max_n, "s2v_partial_sol_rec.txt"); // TODO: pass tsp instance name.
 
     list_pred.resize(cfg::batch_size);
     for (int i = 0; i < cfg::batch_size; ++i)

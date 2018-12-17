@@ -69,4 +69,5 @@ python evaluate.py \
     -reg_hidden $reg_hidden \
     -momentum 0.9 \
     -l2 0.00 \
-    -w_scale $w_scale
+    -w_scale $w_scale \
+    -tsp_file $sample_name

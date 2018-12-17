@@ -1,3 +1,15 @@
+# Set True only if debugging in vscode, using debug configuration "s2v_mvc main.py"
+DEBUG_CPP = False 
+if DEBUG_CPP:
+    import ptvsd
+    # port=3000
+    # ptvsd.enable_attach(secret='my_secret', address =('127.0.0.1', port))
+    # ptvsd.wait_for_attach()
+    # 5678 is the default attach port in the VS Code debug configurations
+    print("Waiting for debugger attach")
+    ptvsd.enable_attach(address=('localhost', 5678), redirect_output=True)
+    ptvsd.wait_for_attach()
+    breakpoint()
 import numpy as np
 import networkx as nx
 import cPickle as cp
@@ -7,7 +19,9 @@ import os
 import sys
 import time
 from tqdm import tqdm
-
+from concorde.tsp import TSPSolver
+from concorde.tests.data_utils import get_dataset_path
+        
 sys.path.append( '%s/tsp2d_lib' % os.path.dirname(os.path.realpath(__file__)) )
 from tsp2d_lib import Tsp2dLib
     
@@ -61,7 +75,7 @@ def GetGraph(fname, need_norm):
     assert len(coors) == n_nodes
     g = nx.Graph()
     g.add_nodes_from(range(n_nodes))
-    nx.set_node_attributes(g, 'pos', coors)
+    nx.set_node_attributes(g, name='pos', values=coors)
     return g
 
 def dist(coors, i, j):
@@ -95,9 +109,37 @@ if __name__ == '__main__':
     opt = {}
     for i in range(1, len(sys.argv), 2):        
         opt[sys.argv[i][1:]] = sys.argv[i + 1]
+    
+    # model_file = find_model_file(opt)
+    # assert model_file is not None
+    # print 'loading', model_file
+    # sys.stdout.flush()
+    # api.LoadModel(model_file)
 
-    fname = '%s/%s/%s' % (opt['data_root'], opt['folder'], opt['sample_name'])
+    # Test all instances in ../../data/tsplib/
+    tsp_files = os.listdir('../../data/tsplib')
+    approx_ratio = []
+    time_ratio = []
+    s2v_sol = []
+    s2v_time = []
+    concorde_sol = []
+    concorde_time = []
 
+    tsp_file = opt['tsp_file']
+    # for tsp_file in tsp_files:
+    fname = '%s/%s/%s' % (opt['data_root'], opt['folder'], tsp_file)
+    # fname = '%s/%s/%s' % (opt['data_root'], opt['folder'], opt['sample_name'])
+
+    # Concorde:
+    # fname = get_dataset_path("berlin52")
+    solver = TSPSolver.from_tspfile(fname)
+    t3 = time.time()
+    solution = solver.solve()
+    t4 = time.time()
+    # print 'Concorde sol val:' , solution.optimal_value
+    concorde_sol.append(solution.optimal_value)
+    concorde_time.append(t4-t3)
+    
     model_file = find_model_file(opt)
     assert model_file is not None
     print 'loading', model_file
@@ -108,7 +150,7 @@ if __name__ == '__main__':
     api.InsertGraph(g_norm, is_test=True)
     g_raw = GetGraph(fname, need_norm=False)
     
-    test_name = opt['sample_name']
+    test_name = tsp_file # opt['sample_name']
     result_file = '%s/test-%s-gnn-%s-%s.csv' % (opt['save_dir'], test_name, opt['min_n'], opt['max_n'])
 
     with open(result_file, 'w') as f_out:
@@ -125,4 +167,21 @@ if __name__ == '__main__':
             f_out.write(' %d' % sol[i + 1])
         f_out.write(',%.6f\n' % (t2 - t1))
 
-    print 'average tour length: ', val
+    # print 'average tour length: ', val
+    s2v_sol.append(val)
+    s2v_time.append(t2-t1)
+
+    approx_ratio.append(s2v_sol[-1]/concorde_sol[-1])
+    time_ratio.append(s2v_time[-1]/concorde_time[-1])
+    
+    
+    print 'average approximation ratio:', np.mean(approx_ratio)
+    print 'average solution time ratio:', np.mean(time_ratio)
+
+    with open("tsplib_aprx_ratio.txt", "a") as myfile:
+        myfile.write(str(val/solution.optimal_value)+"\n")
+    with open("tsplib_time_ratio.txt", "a") as myfile:
+        myfile.write(str(s2v_time[-1]/concorde_time[-1])+"\n")
+    with open("tsplib_performance.txt", "a") as myfile:
+        myfile.write(tsp_file + " " + str(nx.number_of_nodes(g_norm)) + " " +str(val/solution.optimal_value) +" "+ str(s2v_time[-1]/concorde_time[-1])+"\n")
+    
