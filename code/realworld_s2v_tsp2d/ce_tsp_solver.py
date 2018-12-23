@@ -337,9 +337,9 @@ if __name__ == "__main__":
     # test tsplib - symmetric tsp
     files = os.listdir('../../data/tsplib')
     for fname in files:
-        print('Solving ', fname)
+        print('Solving ' + fname)
         costs = read_tsp('../../data/tsplib/' + fname)
-        CE = CrossEntropyTSP(costs=costs, c=3, rho=0.01, d=5, alpha=0.7, seed=13)
+        CE = CrossEntropyTSP(costs=costs, c=1, rho=0.01, d=5, alpha=0.7, seed=13)
         score, total_time = CE.shortestPath(verbose=True)
         with open("tsplib_ce_scores.txt", "a") as myfile:
             myfile.write(fname + ' ' + str(score) + ' ' + total_time + "\n")
