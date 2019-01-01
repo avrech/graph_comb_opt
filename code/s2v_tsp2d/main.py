@@ -71,7 +71,7 @@ def PrepareGraphs(isValid):
             assert len(coors) == n_nodes
             g = nx.Graph()
             g.add_nodes_from(range(n_nodes))
-            nx.set_node_attributes(g, 'pos', coors)
+            nx.set_node_attributes(g, name='pos', values=coors)
             api.InsertGraph(g, is_test=isValid)
 
 if __name__ == '__main__':
