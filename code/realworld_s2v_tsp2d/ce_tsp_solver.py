@@ -1,8 +1,6 @@
-''' Cross-Enthropy Method for TSP.
-based on http://web.mit.edu/6.454/www/www_fall_2003/gew/CEtutorial.pdf
-implementation: http://web.mit.edu/6.454/www/www_fall_2003/gew/CEtutorial.pdf
+''' Cross-Enthropy Method for TSP. 
+source: https://github.com/v-iashin/CrossEntropyTSP/blob/master/CE_for_ft53.ipynb
 '''
-
 import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
@@ -339,11 +337,11 @@ if __name__ == "__main__":
         CE.shortestPath(verbose=True)
 
     # test tsplib - symmetric tsp
-    files = os.listdir('../../data/small_cities_from_tsplib')
+    files = os.listdir('../../data/tsplib')
     for fname in files:
-        print('Solving ' + fname)
-        costs = read_tsp('../../data/small_cities_from_tsplib/' + fname)
-        CE = CrossEntropyTSP(costs=costs, c=1, rho=0.01, d=5, alpha=0.7, seed=13)
-        path, total_time = CE.shortestPath(verbose=False)
+        print('Solving ', fname)
+        costs = read_tsp('../../data/tsplib/' + fname)
+        CE = CrossEntropyTSP(costs=costs, c=3, rho=0.01, d=5, alpha=0.7, seed=13)
+        score, total_time = CE.shortestPath(verbose=True)
         with open("tsplib_ce_scores.txt", "a") as myfile:
-            myfile.write(fname + ' ' + str(path) + ' ' + total_time + "\n")
+            myfile.write(fname + ' ' + str(score) + ' ' + total_time + "\n")

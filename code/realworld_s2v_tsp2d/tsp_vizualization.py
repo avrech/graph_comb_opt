@@ -82,7 +82,7 @@ if __name__ == "__main__":
     ###################################################################   
     # Build partial tours from cross-entropy method record file.
     solver_name = "Cross-Entropy Method"
-    with open("berlin52_tsp_ce_result.txt") as f:
+    with open("ce_sol_berlin52.tsp.txt") as f:
         lines = [line.rstrip('\n').split() for line in f]
 
     partial_tours = np.array([[int(n) for n in lines[1][:idx+1]] for idx in range(lines[1].__len__()-2)])

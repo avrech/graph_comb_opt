@@ -184,4 +184,7 @@ if __name__ == '__main__':
         myfile.write(str(s2v_time[-1]/concorde_time[-1])+"\n")
     with open("tsplib_performance.txt", "a") as myfile:
         myfile.write(tsp_file + " " + str(nx.number_of_nodes(g_norm)) + " " +str(val/solution.optimal_value) +" "+ str(s2v_time[-1]/concorde_time[-1])+"\n")
-    
+    with open("results/tsplib_s2v_and_concorde_results.txt", "a") as myfile:
+        myfile.write(tsp_file + " s2v_value: " + str(val) + " s2v_time: " + str(s2v_time[-1])
+                     + " concorde_value: " + str(solution.optimal_value)
+                     + " concorde_time: " + str(concorde_time[-1]) + "\n")

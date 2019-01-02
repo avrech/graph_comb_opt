@@ -49,11 +49,11 @@ max_iter=200000
 save_dir=$result_root/ntype-$net_type-embed-$embed_dim-nbp-$max_bp_iter-rh-$reg_hidden
 
 
-rm tsplib_aprx_ratio.txt
-rm tsplib_time_ratio.txt
-rm tsplib_performance.txt
+#rm tsplib_aprx_ratio.txt
+#rm tsplib_time_ratio.txt
+#rm tsplib_performance.txt
 # iterate over tsp files in tsp
-for fullfilename in ../../data/tsplib/*.tsp; do
+for fullfilename in ../../data/small_cities_from_tsplib/*.tsp; do
     filename=$(basename "$fullfilename")
     # ./MyProgram.exe "$filename" "Logs/$(basename "$filename" .txt)_Log$i.txt"
     python evaluate.py \
