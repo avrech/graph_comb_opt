@@ -40,7 +40,7 @@ mem_size=50000
 max_iter=200000
 
 # folder to save the trained model
-result_root=results/dqn-$g_type-$min_n-$max_n
+result_root=results/dqn-$g_type-$min_n-$max_n-nstep-$n_step
 
 save_dir=$result_root/ntype-$net_type-embed-$embed_dim-nbp-$max_bp_iter-rh-$reg_hidden
 
