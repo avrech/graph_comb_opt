@@ -1,8 +1,6 @@
 #!/bin/bash
 
-g_type=clustered
-
-result_root=results/dqn-$g_type
+g_type=random
 
 # max belief propagation iteration
 max_bp_iter=4
@@ -33,8 +31,8 @@ n_step=1
 
 knn=10
 
-min_n=15
-max_n=20
+min_n=50
+max_n=100
 
 num_env=1
 mem_size=50000
@@ -42,6 +40,8 @@ mem_size=50000
 max_iter=200000
 
 # folder to save the trained model
+result_root=results/dqn-$g_type-$min_n-$max_n
+
 save_dir=$result_root/ntype-$net_type-embed-$embed_dim-nbp-$max_bp_iter-rh-$reg_hidden
 
 if [ ! -e $save_dir ];
