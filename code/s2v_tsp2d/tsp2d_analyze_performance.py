@@ -18,7 +18,7 @@ if __name__ == "__main__":
     plt.figure(1)
     plt.xlabel("Graph Size [#nodes]")
     plt.ylabel("Approximation Ratio")
-    plt.title("Approximation Ratio vs. Graph Size\nAverage = %.2f" % np.mean(aprx_ratio))
+    plt.title("Approximation Ratio vs. Graph Size\nAverage = %.3f" % np.mean(aprx_ratio))
     plt.scatter(graph_size,aprx_ratio)
     X = graph_size.reshape(-1,1)
     y = aprx_ratio.reshape(-1,1)
