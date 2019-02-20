@@ -9,33 +9,49 @@
 \DeclareMathOperator*{\argmin}{argmin}
 \newcommand*\perm[2][^n]{\prescript{#1\mkern-2.5mu}{}P_{#2}}
 \begin{document}
-\title{RL Formulation for the TSP Problem}
+\title{RL Approach for the TSP Problem}
 \author{Avrech Ben-David}
 \maketitle
+\begin{abstract}
+In this work we review the recent works in this field. Our purpose is to point on an optional improvement direction which has not been investigated yet, and which we think has a good potential. 
+\end{abstract}
+\section{Introduction}
+The TSP problem is a fundemental NP-hard combinatorial problem with myriad applications in the industry. Recently, many RL approaches were investigated in order to learn an efficient heuristic to solve the TSP problem. A probable reason is that many variations of the TSP problem can be simply formulated in RL terms, saving the costly development time of ad-hoc solvers. 
 
+However, there is still a gap of 10\% in performance between all these approaches and the best known solver \cite{concorde}, Concorde. Concorde has time complexity of $\mathcal{O}(n^22^n)$ in the worst case, but in the average case it solves instances of thousands of cities to optimality in minutes. The main weakness of Concorde is that it able to solve only the symmetric TSP. 
 
-\section*{Problem Statement}
-Given a graph $G(V,E)$, find the shortest tour path, such that every node in $V$ is visited only once. Representing the graph nodes as a list: $V = \{1,2,3,...,n\}$, the TSP solution $S$ is a permutation of $V$, such that:
+There is already a success in applying RL to NP-hard combinatorial problems, but the common characteristic of all these 'solved' problems is that they are all \textit{n-choose-k}-like problems. \cite{dai17-tsp-s2v} solve MVC, SCP and MAXCUT to 1\% from the optimal, generalize well and consume much less computation resources than competitive solutions. However, they fail in the TSP. Other works, \cite{bello16-tsp-pnac} and \cite{deudon18-tsp-nr2opt}, use Pointer Network to solve the TSP. All these works solve the instance they were trained on plausibly, but the fail to generalize to larger instances. While \cite{dai17-tsp-s2v} maintain an approximation ratio of 1.1 on a large scale of graphs, the others fail to generalize to more than 100 nodes. 
+
+In this work we follow \cite{dai17-tsp-s2v}, investigating their weaknesses, in order to predict a probably good improvement.
+
+\section{Related Work}
+\cite{bello16-tsp-pnac} were the train locomotive in using Pointer Networks to parameterize a stochastic policy of selecting nodes into the TSP solution. They proposed the common RL formulation for the TSP; the state is the current partial solution - an ordered list of nodes; the action is appending a node to the end of the tour; and the reward is ???. They trained LSTM-based pointer network with policy gradient method (REINFORCE and Actor-Critic) to predict a sequence of nodes one by one. They used Monte-Carlo estimator for the reward signal as it is the natural choice for the TSP, where the total reward can extremely change in the final step, when the loop is closed. Their architecture is limited to fully-connected graphs in the 2D Euclidean space, and requires a long training time. They fail in handling large instances (more than 100 nodes).
+
+\cite{deudon18-tsp-nr2opt}, following \cite{bello16-tsp-pnac}, replaced the LSTMs with feed forward components, leaving the pointing mechanism as is. The decoder, composed of a pipeline of 3 stages, explicitely forgets after three steps. The other RL setting remained the same. Obviously, this simplified implementation achieved poor performance by its own, and for this they used 2opt, a local search algorithm to refine the solution. At the bottom line, the improved the performance of \cite{bello16-tsp-pnac} insignificantly, while reducing the model size and the training time dramatically. Anyway, the suffer from the same poor generalization, and the inference time become very long on large graphs due to the 2opt search.
+
+A completely different approach was proposed by \cite{dai17-tsp-s2v}. They used S2V \cite{dai16-s2v} to represent the graph nodes, and learned a Q-function over these features. They trained the network end to end, via n-step Q-learning. Their state is the current partial solution, the action is inserting a node to the partial solution such that the increase in the total length is minimal. The reward is simply the negative increase in the tour length. Their architecture can easily handle any graph structure, and maintain performance on much larger graphs than it was trained on. The main problem is that the Q-function averages the nodes features, throwing away the information of the nodes order. This problem can be viewed in the order the network selects nodes to the partial solution. The network was probably planned to address the mentioned \textit{n-choose-k}-like problems, which are insensitive to the nodes prediction order.
+
+Following, in Section 3 we describe the solution in detail. First we define the RL formulation for the TSP. Next we give an introduction to the network components. The training process is explained in section 4. We detail our experimental setup and results in section 5. In section 6 we discuss our findings, and offer a future work. Conclusions are summarized in Section 7.
+
+\section{Methodology}
+\subsection{Problem Statement and RL Formulation}
+The traveling salesman problem is: given a graph $G(V,E)$, find the visiting order, such that every node in $V$ is visited exactly once, and the total length of the circular tour is minimal. Representing the graph nodes as a list: $V = \{1,2,3,...,n\}$, the TSP solution $S$ is a permutation of $V$, such that:
 
 \begin{equation} \label{tsp_statement}
 	S = \argmin_{s \in P(V)} C(S)
 \end{equation}
 
-Where $C(S)$ is the TSP cost function - i.e. the tour path length:
+Where $C(S)$ is the TSP cost function - i.e. the tour length:
 
 \begin{equation}  \label{tsp_cost}
-	C(S) := \mathlarger{\sum}_{i=1}^{|S|}{distance(s_i, s_{i+1})} + distance(s_{|S|}, s_i)
+	C(S) := \mathlarger{\sum}_{i=1}^{|S|}{distance(s_i, s_{i+1})} + distance(s_{|S|}, s_1)
 \end{equation}
 
-Generally, the $distance(\cdot,\cdot)$ function can be any metric measure that fits the problem specifications.
+In the classic TSP, the $distance(\cdot,\cdot)$ can be any metric that preserve the triangle inequality. Here we deal only with the Euclidean distance. Note that the flexibility of RL frameworks allow to use any metric to calculate the reward, according to the problem characteristics.
 
-Finding the optimal solution is a NP-hard problem. Exact solvers become slow on large problems. Furthermore, any change in the problem setting require visiting the exact algorithm again and adapt it to the modified problem.
-
-TSP-solvers are often evaluated on the degenerated problem of fully-connected graphs, with the $2D euclidean$ metric. 
-
-\section*{TSP RL Formulation}	
-The TSP problem naturally lands to the RL standard formulation, mainly because the final $reward$ is well defined in the TSP problem statement itself. 
-\cite{dai2017learning} use Q-Learning framework such that the tuple $\{S,A,R\}$ is defined as follows:
+\section{TSP RL Formulation}	
+The TSP problem naturally lands to the RL standard formulation, mainly because the final $reward$ is well defined in the TSP statement itself. 
+\cite{dai17-tsp-s2v} use fitted Q-Learning framework. The MDP is defined as follows:
 \begin{list}{}{}
 	\item[•] State $S(k)$ - An ordered sequence of $k$ selected nodes $\in \perm[n]{k}$, representing the current partial solution.
 	\item[•] Action $a(v)$ - Adding a node $v \not\in S(k)$ to the partial solution, and placing it greedily to minimize the increase in the $C(S)$. This comes with the transition from state $S$ to $S'$.
@@ -45,18 +61,18 @@ The TSP problem naturally lands to the RL standard formulation, mainly because t
 The cummulative $reward$ of the terminal state $\hat{S}$ concides exactly to the objective function, i.e. the total tour length:
 Actually, we use the negative reward, so maximizing the reward is correlative minimizing the tour length.
 
-\subsection*{Q-Learning}
+\subsection{Q-Learning}
 We follow S2V paradigm of approximating the State-Action value function.
 Designing the $Q(S,a)$ function is the main task of us. S2V-DQN uses a permutation invariant function, in the manner that it summes the partial solution nodes features. Probably it was designed at first for permutation-agnostic problems, such as MVC.
 
 The desired $Q$ function has to be sensitive to the visiting order of the nodes, but must not overfit to specific input order. 
 
-\cite{Bello} designed Pointer Network to learn a policy using policy gradient and actor-critic method. They also used MC estimator instead of TD(n). Pointer Network looks a natural choice to solve the TSP problem. The intuition behind using Monte Carlo for the TSP problem is that it captures the total tour length. TSP is not like common combinatorial problems (e.g. shortest path), where a partial solution is also the optimal solution for the corresponding reduced problem. So making greedy decisions might cost a lot at the end.
+\cite{bello16-tsp-pnac} designed Pointer Network to learn a policy using policy gradient and actor-critic method. They also used MC estimator instead of TD(n). Pointer Network looks a natural choice to solve the TSP problem. The intuition behind using Monte Carlo for the TSP problem is that it captures the total tour length. TSP is not like common combinatorial problems (e.g. shortest path), where a partial solution is also the optimal solution for the corresponding reduced problem. So making greedy decisions might cost a lot at the end.
  
-There are several works that follow \cite{Bello}, however, they do not show better performance. 
+There are several works that follow \cite{bello16-tsp-pnac}, however, they do not show better performance. 
 A partial list: \\
 
-\cite{deudon-policy-gradient}, PN-AC-solver for ATSP\footnote{https://github.com/MichelDeudon/neural-combinatorial-optimization-rl-tensorflow}  \\
+\cite{deudon18-tsp-nr2opt}, PN-AC-solver for ATSP\footnote{https://github.com/MichelDeudon/neural-combinatorial-optimization-rl-tensorflow}  \\
 
 Decision version of TSP, use graph-embedding like S2V followed by PN-AC.
 
@@ -64,9 +80,9 @@ Decision version of TSP, use graph-embedding like S2V followed by PN-AC.
 
 
 
-\section*{Experiments}
+\section{Experiments}
 	The Concorde\footnote{https://github.com/jvkersch/pyconcorde} algorithm was used as the optimal solution, which the following approximation ratio and execution time ratio are related to. As a baseline model we took the cross-entropy method\footnote{https://github.com/v-iashin/CrossEntropyTSP}
-\subsection*{Realworld Data - Experimental Setup}
+\subsection{Realworld Data - Experimental Setup}
 	The results below refer to the Tsplib dataset\footnote{http://dimacs.rutgers.edu/Challenges/TSP/}. The dataset contains 38 cities of 51-318 nodes each one.
 	The S2V model in this experiment was trained for 100,000 epochs on a single sample (berlin52). 
 	Table \ref{tb_tsplib_performance_s2v_vs_ce} shows the averaged approximation and time ratio of S2V over the entire data-set. The ratio is defined as $\dfrac{S2V_{performance}}{Concorde_{performance}} $ so as the ratio is closer to 1 the S2V works better.
@@ -87,7 +103,7 @@ Decision version of TSP, use graph-embedding like S2V followed by PN-AC.
 	Additional experiments with traditional setting are detailed below. I did not evaluated the cross-entropy method on larger graphs than 80 nodes, because it becomes extremely slow. It takes around 11 minutes to solve a graph of 52 nodes, and it seems like it grows exponentially.
 	
 
-\subsection*{Synthetic Data Experiment}
+\subsection{Synthetic Data Experiment}
 In this experiment the network is trained on synthetic dataset\footnote{https://www.dropbox.com/sh/r39596h8e26nhsp/AADRm5mb82xn7h3BB4KXgETsa?dl=0}, consist of either clustered or uniformly distributed graphs.
 I trained the network on 1000 graphs of 15-20 and 50-100 nodes. Table \ref{tb_tsp2d_performance_s2v} lists the achieved performance. 
 
@@ -103,34 +119,13 @@ I trained the network on 1000 graphs of 15-20 and 50-100 nodes. Table \ref{tb_ts
 
 There is no significant improvement upon training on a single sample. It seems that this performance level really reflects the S2V architecture expressiveness.
 	
-\subsection*{The Paper Results}
-	The table in Figure \ref{im_paper_aprx} shows the S2V approximation ratio as it was reported in the paper. The S2V approximation ratio on the TSP problem is approximately 1.1 for every train-test setup, in comparison to other problems (MVC, SCP etc.) where it shows outstanding perormance.
-	\begin{figure}[h]
-	\centering
-	\includegraphics[width=1\textwidth]{tsp_paper_res_table.eps}
-	\caption{Paper Approximation Ratio}
-	\medskip
-	\small
-	Approximation ratio as function of the train-set and the test-set graphs' size. The efforts to train the network on larger graphs did not improve the performance significantly. For a certain test graph's size, the perfomance is roughly the same for all training sets. 
-	\label{im_paper_aprx}
-	\end{figure}
-	
-	\begin{figure}[h]
-	\centering
-	\includegraphics[width=1\textwidth]{tsp_paper_res_comp.eps}
-	\caption{Approximation Ratio Comparison}
-	\medskip
-	\small
-	A comparison of selected algorithms approximation ratio. S2V does not show outstanding performance, and even worse than other approximation methods.
-	\label{im_paper_aprx_comp}
-	\end{figure}
-	 
 
-\section*{The Authors Explanation}
+
+\section{The Authors Explanation}
 	The authors explained the fact that S2V did not show impressive performance on the TSP problem in that the tested graphs are fully-connected. The graph structure is less important, and even "graph-agnostic" methods achieve the same performance. 
 	Actually, the TSP problem was not widely investigated in the paper relative to the other problems.
 
-\section*{My Conclusions}
+\section{My Conclusions}
 	This work does not show outstanding performance on the TSP problem. The authors argue that it is because of the tested graphs are fully-connected, so that the 'graph structure' importance decreases, and the main advantage of the model doesn't expressed well. Such an argument should be supported in simple test. 
 	
 	I think that the S2V model has a built-in disadvantage regarding sequence mapping. The feedback that the model receivces from the currently constructed solution lacks the essential information about the tour path. The nodes features are summed together (in order to be invariant to permutations). It works well on MVC and probably on any other ${n \choose k}$-like problem, because the solution in such problems do not care of the nodes order. 
@@ -139,8 +134,6 @@ There is no significant improvement upon training on a single sample. It seems t
 	At the bottom-line, the S2V model, as is, do not fit the TSP problem's characteristics. 
 
 
-\textbf{Experiment details as it is described in the paper}\footnote{https://arxiv.org/pdf/1704.01665.pdf}: \\
-
-\bibliography{TSP_RL}
+\bibliography{tsp-rl-report}
 \bibliographystyle{plain}
 \end{document}
