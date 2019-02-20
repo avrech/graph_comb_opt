@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from sklearn import datasets, linear_model
-TESTSET = 'tsplib' #or 'tsp2d_clustered'
+TESTSET = 'nr_test_tsp_norm1e6' # 'tsplib' | 'tsp2d' | 'nr_test_tsp_norm1e6'
 if __name__ == "__main__":
     with open(TESTSET + "_performance.txt") as f:
         lines = [line.rstrip('\n').split() for line in f]

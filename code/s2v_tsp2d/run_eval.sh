@@ -1,11 +1,11 @@
 #!/bin/bash
 
-g_type=clustered
+g_type=random
 
-result_root=results/dqn-$g_type
 
-test_min_n=15
-test_max_n=20
+
+test_min_n=100
+test_max_n=100
 
 # max belief propagation iteration
 max_bp_iter=4
@@ -36,22 +36,23 @@ n_step=1
 
 knn=10
 
-min_n=15
-max_n=20
+min_n=40
+max_n=50
 
 num_env=1
 mem_size=50000
 
-max_iter=200000
+max_iter=100000
 
 # folder to save the trained model
+result_root=results/dqn-$g_type-$min_n-$max_n-nstep-$n_step
 save_dir=$result_root/ntype-$net_type-embed-$embed_dim-nbp-$max_bp_iter-rh-$reg_hidden
 
 python evaluate.py \
     -net_type $net_type \
     -dev_id $dev_id \
     -n_step $n_step \
-    -data_root ../../data/tsp2d \
+    -data_root ../../data/nr_test_tsp200_norm1e6 \
     -decay $decay \
     -knn $knn \
     -test_min_n $test_min_n \

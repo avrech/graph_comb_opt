@@ -31,13 +31,13 @@ n_step=1
 
 knn=10
 
-min_n=50
-max_n=100
+min_n=40
+max_n=50
 
 num_env=1
 mem_size=50000
 
-max_iter=200000
+max_iter=100000
 
 # folder to save the trained model
 result_root=results/dqn-$g_type-$min_n-$max_n-nstep-$n_step

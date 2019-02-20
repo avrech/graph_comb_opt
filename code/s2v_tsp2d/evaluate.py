@@ -1,3 +1,4 @@
+import pickle
 import numpy as np
 import networkx as nx
 import cPickle as cp
@@ -7,13 +8,13 @@ import os
 import sys
 import time
 from tqdm import tqdm
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../pyconcorde'))
 from concorde.tsp import TSPSolver
 from concorde.tests.data_utils import get_dataset_path
-
 sys.path.append( '%s/tsp2d_lib' % os.path.dirname(os.path.realpath(__file__)) )
 from tsp2d_lib import Tsp2dLib
     
-TESTSET = 'tsplib' # or 'tsp2d'
+TESTSET = 'nr_test_tsp200_norm1e6' # 'tsplib' | 'tsp2d' | 'nr_test_tsp_norm1e6' | 'nr_test_tsp200_norm1e6'
 
 def find_model_file(opt):
     max_n = int(opt['max_n'])
@@ -32,7 +33,7 @@ def find_model_file(opt):
                     best_r = r
                     best_it = it
     assert best_it >= 0
-    print 'using iter=', best_it, 'with r=', best_r
+    print('using iter=', best_it, 'with r=', best_r)
     return '%s/nrange_%d_%d_iter_%d.model' % (opt['save_dir'], min_n, max_n, best_it)
 
 def TestSet():
@@ -60,14 +61,14 @@ def TestSet():
                 nx.set_node_attributes(g, name='pos', values=coors)
                 yield g, fname            
 
-    elif TESTSET == 'tsplib':
-        folder = '/home/daniela/avrech/technion/049053/graph_comb_opt/data/tsplib/'
+    else: # TESTSET == 'tsplib' | 'nr_test_tsp_norm1e6' | 'nr_test_tsp200_norm1e6':
+        folder = os.path.join('/home/daniela/avrech/technion/049053/graph_comb_opt/data', TESTSET)
         files =  os.listdir(folder)
         for fname in files:
             coors = {}
             in_sec = False
             n_nodes = -1
-            tsp_file = folder + fname
+            tsp_file = os.path.join(folder,fname)
             node_idx = 0
             with open(tsp_file, 'r') as f_tsp:
                 for l in f_tsp:
@@ -101,7 +102,7 @@ if __name__ == '__main__':
 
     model_file = find_model_file(opt)
     assert model_file is not None
-    print 'loading', model_file
+    print('loading', model_file)
     sys.stdout.flush()
     api.LoadModel(model_file)
 
@@ -118,6 +119,7 @@ if __name__ == '__main__':
     
     n_test = 1000
     frac = 0.0
+    s2v_concorde_results = {} # results per city in testset.
     if os.path.exists(TESTSET + "_" + opt['g_type'] + "_performance.txt"):
         os.remove(TESTSET + "_" + opt['g_type'] + "_performance.txt")
     if os.path.exists(TESTSET + "_" + opt['g_type'] + "_time_ratio.txt"):
@@ -125,7 +127,7 @@ if __name__ == '__main__':
     if os.path.exists(TESTSET + "_" + opt['g_type'] + "_aprx_ratio.txt"):
         os.remove(TESTSET + "_" + opt['g_type'] + "_aprx_ratio.txt")
     with open(result_file, 'w') as f_out:
-        print 'testing'
+        print('testing')
         sys.stdout.flush()
         idx = 0
         for g, fname in tqdm(TestSet()):
@@ -133,7 +135,7 @@ if __name__ == '__main__':
             # fname = get_dataset_path("berlin52")
             solver = TSPSolver.from_tspfile(fname)
             t3 = time.time()
-            solution = solver.solve()
+            solution = solver.solve(verbose=False)
             t4 = time.time()
             # print 'Concorde sol val:' , solution.optimal_value
             # 1000000.0 is a normalization factor of s2v in TestSet above.
@@ -156,8 +158,8 @@ if __name__ == '__main__':
                 f_out.write(' %d' % sol[i + 1])
             f_out.write(',%.6f\n' % (t2 - t1))
             frac += val
-            testset_name = 'tsplib' if TESTSET == 'tsplib' else "tsp2d_" + opt['g_type']
-            inst_name = fname if TESTSET == 'tsplib' else "inst_" + str(idx)
+            testset_name = TESTSET if TESTSET != 'tsp2d' else "tsp2d_" + opt['g_type']
+            inst_name = fname if TESTSET != 'tsp2d' else "inst_" + str(idx)
             with open(testset_name + "_aprx_ratio.txt", "a") as myfile:
                 myfile.write(str(val/concorde_sol[-1])+"\n")
             with open(testset_name + "_time_ratio.txt", "a") as myfile:
@@ -169,6 +171,12 @@ if __name__ == '__main__':
                             + " concorde_value: " + str(concorde_sol[-1])
                             + " concorde_time: " + str(concorde_time[-1]) + "\n")
             idx += 1
-            
-    print 'average tour length: ', frac / n_test
-    
+            s2v_concorde_results[os.path.basename(inst_name)[:-4]] = {
+                's2v_len': val,
+                's2v_time': s2v_time,
+                'concorde_len': concorde_sol[-1],
+                'concorde_time': concorde_time[-1]}
+    with open(TESTSET+'_concorde_s2v_40_50_results.pkl', 'wb') as f:
+        pickle.dump(s2v_concorde_results, f)
+                
+    print('average tour length: ', frac / n_test)
