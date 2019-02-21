@@ -9,6 +9,13 @@
 \DeclareMathOperator*{\argmin}{argmin}
 \DeclareMathOperator*{\argmax}{argmax}
 \newcommand*\perm[2][^n]{\prescript{#1\mkern-2.5mu}{}P_{#2}}
+\usepackage{fullpage}
+\usepackage{times}
+\usepackage{fancyhdr}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+
+
+
 \begin{document}
 \title{Reinforcement Learning Basics}
 \author{Avrech Ben-David}
@@ -105,6 +112,29 @@ q^*(s,a) = \mathcal{R}_s^a + \gamma\sum_{s' \in \mathcal{S}} \mathcal{P}_{ss'}^a
 \end{equation}
 
 If the AI agent can solve this equation than it basically means that the problem in the given environment is solved. The agent knows in any given state or situation the quality of any possible action with regards to the objective and can behave accordingly.
+
+\section{DQN}
+Q-networks are an approximator of the action-value function $Q(s,a)$. Typically, the state-action space is huge, and therefore, instead of optimizing the $Q$ function itslef, we optimize it's approximator $Q(s,a;\Theta)$. We skip on the simpler on-policy methods as SARS'A' and jump to the DQN algorithm (which is used in our project).
+
+The original DQN algorithm \cite{dqn2013} makes q iterations as follows:
+
+\begin{algorithm}[H]
+\SetAlgoLined
+\KwData{}
+\KwResult{$\Theta$}
+ initialization\;
+ \While{While condition}{
+  instructions\;
+  \eIf{condition}{
+   instructions1\;
+   instructions2\;
+   }{
+   instructions3\;
+  }
+ }
+ \caption{DQN}
+\end{algorithm}
+
 
 \bibliography{tsp-rl-report}
 \bibliographystyle{plain}
