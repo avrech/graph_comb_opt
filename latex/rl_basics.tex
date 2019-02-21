@@ -1,0 +1,111 @@
+\documentclass[10pt,a4paper,draft]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{relsize}
+\usepackage{mathtools}
+\usepackage[final]{graphicx}
+\DeclareMathOperator*{\argmin}{argmin}
+\DeclareMathOperator*{\argmax}{argmax}
+\newcommand*\perm[2][^n]{\prescript{#1\mkern-2.5mu}{}P_{#2}}
+\begin{document}
+\title{Reinforcement Learning Basics}
+\author{Avrech Ben-David}
+\maketitle
+\begin{abstract}
+This is a summary of the RL fundementals and includes our particular case of combinatorial problems. 
+\end{abstract}
+\section{Markov Decision Process}
+General MDP is represented by the tuple $\{\mathcal{S,A,R,P},\gamma\}$, where:
+\begin{list}{•}{}
+	\item $\mathcal{S}$ - The state space.
+	\item $\mathcal{A}$ - A finite action space.
+	\item $\mathcal{R}_s^a$ - The expected reward after taking action $a$ in the state $s$, \\ i.e. $\mathbb{E}[R_{t+1} \mid S_t = s, A_t = a]$
+	\item $\mathcal{P}_{ss'}^a$ - the probability of transition to state $s'$ after taking action $a$ in the state $s$
+	\item $\mathcal{\gamma}$ - Discount factor $\in [0,1]$
+
+\end{list}
+We assume ergodic MDP, i.e. the transition matrix does not change in time.
+
+\section{RL Foundations}
+The agent's goal is maximizing the total reward:
+\begin{equation}
+G_t = \sum_{k=0}^{\infty} \gamma^kR_{t+1+k}
+\end{equation}
+
+The agent learn a policy (here comes the Markov property):
+\begin{equation}
+\pi(a|s) = \mathbb{P}[A_t = a \mid S_t = s]
+\label{policy_def}
+\end{equation}
+
+In MDP, the value function is the expected total reward, starting from state $s$, and then following policy $\pi$:
+\begin{equation}
+v_{\pi}(s) = \mathbb{E}_{\pi}[G_t \mid S_t = s] = \mathbb{E}_{\pi}[R_{t+1} + \gamma v_{\pi}(S_{t+1}) \mid S_t = s]
+\label{vf_def}
+\end{equation}
+
+The action-value function is the expected total reward, starting from state $s$, taking action $a$, and then following policy $\pi$:
+\begin{equation}
+q_{\pi}(s,a) = \mathbb{E}_{\pi}[G_t \mid S_t = s, A_t = a] = \mathbb{E}_{\pi}[R_{t+1} + \gamma q_{\pi}(S_{t+1},A_{t+1}) \mid S_t = s, A_t = a]
+\label{qf_def}
+\end{equation}
+
+Subtituting $v$ and $q$ recursively in \eqref{vf_def} and \eqref{qf_def} respectively:
+\begin{equation}
+v_{\pi}(s) =\mathbb{E}_{\pi}[R_{t+1} + \gamma v_{\pi}(S_{t+1}) \mid S_t = s]
+\label{vf_r_def}
+\end{equation}
+
+\begin{equation}
+q_{\pi}(s,a) = \mathbb{E}_{\pi}[R_{t+1} + \gamma q_{\pi}(S_{t+1},A_{t+1}) \mid S_t = s, A_t = a]
+\label{qf_r_def}
+\end{equation}
+
+Intuitively, the value-function is the total expectation on $q$:
+\begin{equation}
+v_{\pi}(s) = \sum_{a \in \mathcal{A}} \pi(a|s)q_{\pi}(s,a)
+\label{vq_relation}
+\end{equation}
+
+In the opposite direction:
+\begin{equation}
+q_{\pi}(s,a) = \mathcal{R}_s^a + \gamma\sum_{s' \in \mathcal{S}} \mathcal{P}_{ss'}^a v_{\pi}(s')
+\label{qv_relation}
+\end{equation}
+
+Subtituing \eqref{vq_relation} into \eqref{qv_relation} we get the recursive  form:
+\begin{equation}
+q_{\pi}(s,a) = \mathcal{R}_s^a + \gamma\sum_{s' \in \mathcal{S}} \mathcal{P}_{ss'}^a \sum_{a' \in \mathcal{A}} \pi(a'|s')q_{\pi}(s',a')
+\label{q_r}
+\end{equation}
+
+\section{Bellman Optimality Equation}
+Equation \eqref{q_r} define recursively the value of action $a$ in state $s$, where the policy allows uncertainty.
+Anyway, if we had an oracle which tell us the best action every time, the optimal policy was:
+\begin{equation}
+\pi^*(a|s) = 	
+	\begin{cases} 
+		1 & \text{if } a = \argmax_a q^*(s,a) \\ 
+		0 & \text{otherwise}
+	\end{cases}
+\label{opt_policy}
+\end{equation}
+and the optimal $q$ function was the $q$ that follows the optimal policy in \eqref{opt_policy}:
+\begin{equation}
+q^*(s,a) = \max_{\pi} q_{\pi}(s,a)
+\label{opt_q}
+\end{equation}
+
+Now we can subtitue \eqref{opt_policy} into \eqref{q_r}, replacing the stochastic policy with the optimal policy, and get the Bellman optimality equation:
+\begin{equation}
+q^*(s,a) = \mathcal{R}_s^a + \gamma\sum_{s' \in \mathcal{S}} \mathcal{P}_{ss'}^a \max_{a'} q^*(s',a')
+\label{bellman_opt_q_eq}
+\end{equation}
+
+If the AI agent can solve this equation than it basically means that the problem in the given environment is solved. The agent knows in any given state or situation the quality of any possible action with regards to the objective and can behave accordingly.
+
+\bibliography{tsp-rl-report}
+\bibliographystyle{plain}
+\end{document}
