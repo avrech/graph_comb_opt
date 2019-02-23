@@ -13,7 +13,9 @@
 \usepackage{times}
 \usepackage{fancyhdr}
 \usepackage[ruled,vlined,linesnumbered]{algorithm2e}
-
+\newcommand\mycommfont[1]{\footnotesize\ttfamily\textcolor{blue}{#1}}
+\SetCommentSty{mycommfont}
+\usepackage{xcolor}
 
 
 \begin{document}
@@ -114,27 +116,130 @@ q^*(s,a) = \mathcal{R}_s^a + \gamma\sum_{s' \in \mathcal{S}} \mathcal{P}_{ss'}^a
 If the AI agent can solve this equation than it basically means that the problem in the given environment is solved. The agent knows in any given state or situation the quality of any possible action with regards to the objective and can behave accordingly.
 
 \section{DQN}
-Q-networks are an approximator of the action-value function $Q(s,a)$. Typically, the state-action space is huge, and therefore, instead of optimizing the $Q$ function itslef, we optimize it's approximator $Q(s,a;\Theta)$. We skip on the simpler on-policy methods as SARS'A' and jump to the DQN algorithm (which is used in our project).
 
-The original DQN algorithm \cite{dqn2013} makes q iterations as follows:
+Q-networks are an approximator of the action-value function $Q(s,a)$. Typically, the state-action space is huge, and therefore, instead of optimizing the $Q$ function itslef, we optimize it's approximator $Q(s,a;\theta)$. We skip on the simpler on-policy methods like TD and jump to the DQN algorithm \cite{dqn2013}(which is used in s2v-dqn with slight modification).
+
+In DQN we use the same Q-network architecture for the target and the behavior policy, while the target parameters $\theta^-$ are updated periodically by the learned behavior parameters $\theta$ to prevent moving target. The target policy is a $greedy$ policy:
+
+\begin{equation}
+\pi^*(a|s) = \argmax_{a \in \mathcal{A}}{Q^*(s,a;\theta^-)}
+\label{dqn-target-policy}
+\end{equation}
+Conversely, the behavior policy is $\varepsilon-greedy$:
+
+\begin{equation}
+\pi(a|s) = 
+\begin{dcases}
+    rand(a) 					& \text{w.p  \ \ } \varepsilon \\
+    \argmax_a{Q(s,a;\theta)} 	& \text{otherwise}
+\end{dcases}
+\label{dqn-behavior-policy}
+\end{equation}
+The behavior policy explore the action space during training, with decaying probability. The DQN objective at step $t$ is the squared error between the current $Q(s_t,a_t;\theta)$ and the target $y_t$:
+
+\begin{equation}
+L_t(\theta) = \dfrac{1}{2}(y_t - Q(s,a;\theta)^2
+\label{dqn_objective}
+\end{equation}
+Where the target $y_t$ is the bootstrapped $G_t$ and calculated by the target policy:
+
+\begin{equation}
+y_t = \mathcal{R}_s^a + \gamma\max_{a'}Q(s',a';\theta^-)
+\label{dqn_target}
+\end{equation}
+We optimize this loss using SGD as a regular neural network:
+
+\begin{equation}
+\nabla_{\theta} L_t(\theta) = (y_t - Q(s,a;\theta))\nabla_{\theta}Q(s,a;\theta)
+\end{equation}
+This gradient can be propagated using the regular optimizers. In order to reduce the updates variance without calculating expensive expectations, DQN uses also \textit{experience-replay} $\mathcal{M}$, a memory of the last $N$ transactions $<s,a,r,s'>$ in order to sample random mini-batchs $\mathcal{B} ~^{i.i.d} \mathcal{M}$ and make stable updates, as detailed in algorithm \ref{dqn-alg}:
 
 \begin{algorithm}[H]
-\SetAlgoLined
-\KwData{}
-\KwResult{$\Theta$}
- initialization\;
- \While{While condition}{
-  instructions\;
-  \eIf{condition}{
-   instructions1\;
-   instructions2\;
-   }{
-   instructions3\;
-  }
- }
- \caption{DQN}
+	\SetAlgoLined
+	\DontPrintSemicolon
+	\KwResult{$\theta$}
+ 	Initialize replay memory $\mathcal{M}$ to capacity $N$ \\
+	Initialize random $Q(s,a;\theta)$ parameters \\
+	Set target update $t_{update}$ \\ 
+	Set global counter $t_{global} = 1$ \\
+	\For{episode 1 to L}{
+		Initialize environment and get state $s_0$ \\
+		\For{step t = 1 to T}{
+			select action $a_t$ according to \eqref{dqn-behavior-policy} \\
+			observe reward $r_t$ and new state $s_{t+1}$ \\
+			store $<s_t,a_t,r_t,s_{t+1}>$ in $\mathcal{M}$ \\
+			sample a random mini-batch $\mathcal{B} \stackrel{i.i.d}{\sim} \mathcal{M}$ \\
+			\For{$<s_j, a_j, r_j, s_{j+1}>$ in $\mathcal{B}$}{
+				
+				$y_j \leftarrow 
+					\begin{dcases}
+				    r_j				& \text{for terminal } s_{j+1} \\
+				    r_j + \gamma\max_{a'}Q(s_{j+1},a';\theta^-) 	&  \text{for non-terminal } s_{j+1}
+					\end{dcases} 
+				$ \tcp*{calculate target}
+				$L_j(\theta) \leftarrow \dfrac{1}{2}(y_j - Q(s_j,a_j;\theta)^2$ \tcp*{calculate loss} 
+			}
+			perform SGD on $L_j(\theta)$ \\
+			\If{$t_{global} \mod t_{update} == 0$}{
+				$\theta^- \leftarrow \theta$	\tcp*{update target parameters}		
+			}
+			$t_{global} \leftarrow t_{global} + 1$
+		}
+	}
+	\caption{DQN with Experience Replay}
+ 	\label{dqn-alg}
 \end{algorithm}
 
+\section{N-Step Q Learning}
+N-step Q learning \cite{nstepq2016} is another way to reduce the updates variance and shorten the training time. The main concept is: instead of using eperience replay and making updates by only one agent, many agents explore the environment concurrently, and update asynchronously the shared global target parameters $\theta^-$  periodically. An agent makes $n$ steps continuously, then accumulates its gradient in $TD(n)$ fashion, using the global target to predict the last state value as DQN does. The overall algorithm is detailed in algorithm
+
+\begin{algorithm}[H]
+	\SetAlgoLined
+	\DontPrintSemicolon
+	\KwResult{$\theta$}
+	\tcp{Assume global shared parameter vector $\theta$} 
+	\tcp{Assume global shared target parameter vector $\theta^-$} 
+	\tcp{Assume global shared counter $T=0$} 
+	Initialize thread step counter $t \leftarrow 1$ \\
+	Initialize thread specific parameters  $\theta' \leftarrow \theta$ \\ 
+	Initialize target network parameters  $\theta^- \leftarrow \theta$ \\ 
+	Set target update $t_{update}$ \\ 
+	\For{step t = 1 to $T_{max}$}{
+		clear gradients $d\theta \leftarrow 0$ \\
+		Synchronize thread-specific parameters $\theta' \leftarrow \theta$ \\
+		$t_{start} \leftarrow t$		\\
+		get state $s_t$ \\
+		\While{$s_t$ is not terminal and $t - t_{start} < T_{max}$}{
+			select action $a_t$ according to $varepsilon-greedy$ policy based on $Q(s,a,\theta')$ \\
+			observe reward $r_t$ and new state $s_{t+1}$ \\
+			$t \leftarrow t+1$ \\
+			$T \leftarrow T+1$ \\
+		}
+		$
+			R \leftarrow 
+				\begin{dcases}
+			    	0				& \text{for terminal } s_t \\
+			    	\max_{a'}Q(s_t,a';\theta^-) 	&  \text{for non-terminal } s_t
+				\end{dcases}
+		$ \\
+		\For{$i \in t-1, ... , t_{start}$}{		
+			$R \leftarrow r_i + \gamma R$ \tcp*{calculate discounted reward}
+			$d\theta \leftarrow d\theta + \dfrac{\partial(R - Q(s_i,a_i;\theta')^2}{\partial\theta'}$ \tcp*{accumulate gradients w.r.t $\theta'$} 
+		}
+		\If{$T \mod t_{update} == 0$}{ 
+			$\theta^- \leftarrow \theta$	\tcp*{perform asynchronous update of $\theta$ using $d\theta$}	
+		}
+	}
+	\caption{Asynchronous N-Step Q Learning - actor thread}
+ 	\label{async-n-step-alg}
+\end{algorithm}
+N-step Q learning has several advantages over DQN. 
+\begin{enumerate}
+	\item Memory usage - there is no experience replay. 
+	\item Exploration - several agents explore different regions of the environment concurrently, improving convergence.
+	\item Future reward - DQN makes updates based on the immediate reward only. Here the agent collect n rewards and update each decision many times. 
+\end{enumerate}
+\cite{dai17-tsp-s2v} changed  a little bit the DQN algorithm, in order that it will immitate the 
 
 \bibliography{tsp-rl-report}
 \bibliographystyle{plain}
