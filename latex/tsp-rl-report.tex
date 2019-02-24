@@ -47,7 +47,7 @@ The second and more problematic issue is the reward definition. It is not clear 
 Following, in Section 3 we describe the solution in detail. First we define the RL formulation for the TSP. Next we give an introduction to the network components. The training process is explained in section 4. We detail our experimental setup and results in section 5. In section 6 we discuss our findings, and offer a future work. Conclusions are summarized in Section 7.
 
 \section{Methodology}
-\subsection{Problem Statement and RL Formulation}
+\subsection{Problem Statement}
 The traveling salesman problem is: given a graph $G(V,E)$, find the visiting order, such that every node in $V$ is visited exactly once, and the total length of the circular tour is minimal. Representing the graph nodes as a list: $V = \{1,2,3,...,n\}$, the TSP solution $S$ is a permutation of $V$, such that:
 
 \begin{equation} \label{tsp_statement}
@@ -62,7 +62,7 @@ Where $C(S)$ is the TSP cost function - i.e. the tour length:
 
 In the classic TSP, the $distance(\cdot,\cdot)$ can be any metric that preserve the triangle inequality. Here we deal only with the 2D Euclidean distance. 
 
-\section{TSP RL Formulation}	
+\subsection{TSP RL Formulation}	
 The TSP naturally lands to the RL standard formulation, mainly because the final $reward$ is well defined in the TSP statement itself. 
 \cite{dai17-tsp-s2v} use DQN with \textit{experience replay} with n-step reward (see alg below). The MDP is defined as follows:
 \begin{list}{}{}
@@ -152,17 +152,31 @@ The learning process is detailed in algorithm \eqref{s2v-dqn-alg}.
 				}
 				perform SGD on $L_j(\theta)$ \\
 			}
-			\If{$t_{global} \mod T_{update} == 0$}{
-				$\theta^- \leftarrow \theta$	\tcp*{update target parameters}		
-			}
-			$t_{global} \leftarrow t_{global} + 1$
 		}
+		\If{$t_{global} \mod T_{update} == 0$}{
+			$\theta^- \leftarrow \theta$	\tcp*{update target parameters}		
+		}
+		$t_{global} \leftarrow t_{global} + 1$
 	} 
 	\caption{S2V-DQN: n-step reward with Experience Replay}
  	\label{s2v-dqn-alg}
 \end{algorithm}
 
 Now we can conceptually optimize our network end-to-end.
+
+\section{Training Setup}
+The training process is actually as follows:
+
+
+\begin{list}{•}{•}
+	\item Training starts with 1000 exploration episodes with $\varepsilon = 1$
+	\item $\varepsilon \equiv 1$
+	\item Update target every $T_{update} = 1000$ episodes
+	\item Decay learning rate by 0.95 every 1000 episodes
+\end{list}
+TODO: COMPLETE
+
+
 
 \section{Experiments}
 	The Concorde\footnote{https://github.com/jvkersch/pyconcorde} algorithm was used as the optimal solution, which the following approximation ratio and execution time ratio are related to. As a baseline model we took the cross-entropy method\footnote{https://github.com/v-iashin/CrossEntropyTSP}
