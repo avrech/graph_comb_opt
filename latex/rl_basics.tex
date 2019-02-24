@@ -138,7 +138,7 @@ Conversely, the behavior policy is $\varepsilon-greedy$:
 The behavior policy explore the action space during training, with decaying probability. The DQN objective at step $t$ is the squared error between the current $Q(s_t,a_t;\theta)$ and the target $y_t$:
 
 \begin{equation}
-L_t(\theta) = \dfrac{1}{2}(y_t - Q(s,a;\theta)^2
+L_t(\theta) = (y_t - Q(s,a;\theta)^2
 \label{dqn_objective}
 \end{equation}
 Where the target $y_t$ is the bootstrapped $G_t$ and calculated by the target policy:
@@ -150,7 +150,7 @@ y_t = \mathcal{R}_s^a + \gamma\max_{a'}Q(s',a';\theta^-)
 We optimize this loss using SGD as a regular neural network:
 
 \begin{equation}
-\nabla_{\theta} L_t(\theta) = (y_t - Q(s,a;\theta))\nabla_{\theta}Q(s,a;\theta)
+\nabla_{\theta} L_t(\theta) = 2(y_t - Q(s,a;\theta))\nabla_{\theta}Q(s,a;\theta)
 \end{equation}
 This gradient can be propagated using the regular optimizers. In order to reduce the updates variance without calculating expensive expectations, DQN uses also \textit{experience-replay} $\mathcal{M}$, a memory of the last $N$ transactions $<s,a,r,s'>$ in order to sample random mini-batchs $\mathcal{B} ~^{i.i.d} \mathcal{M}$ and make stable updates, as detailed in algorithm \ref{dqn-alg}:
 
@@ -177,7 +177,7 @@ This gradient can be propagated using the regular optimizers. In order to reduce
 				    r_j + \gamma\max_{a'}Q(s_{j+1},a';\theta^-) 	&  \text{for non-terminal } s_{j+1}
 					\end{dcases} 
 				$ \tcp*{calculate target}
-				$L_j(\theta) \leftarrow \dfrac{1}{2}(y_j - Q(s_j,a_j;\theta)^2$ \tcp*{calculate loss} 
+				$L_j(\theta) \leftarrow (y_j - Q(s_j,a_j;\theta)^2$ \tcp*{calculate loss} 
 			}
 			perform SGD on $L_j(\theta)$ \\
 			\If{$t_{global} \mod t_{update} == 0$}{
@@ -191,7 +191,7 @@ This gradient can be propagated using the regular optimizers. In order to reduce
 \end{algorithm}
 
 \section{N-Step Q Learning}
-N-step Q learning \cite{nstepq2016} is another way to reduce the updates variance and shorten the training time. The main concept is: instead of using eperience replay and making updates by only one agent, many agents explore the environment concurrently, and update asynchronously the shared global target parameters $\theta^-$  periodically. An agent makes $n$ steps continuously, then accumulates its gradient in $TD(n)$ fashion, using the global target to predict the last state value as DQN does. The overall algorithm is detailed in algorithm
+N-step Q learning \cite{nstepq2016} is another way to reduce the updates variance and shorten the training time. The main concept is: instead of using eperience replay and making updates by only one agent, many agents explore the environment concurrently, and update asynchronously the shared global target parameters $\theta^-$  periodically. An agent makes $n$ steps continuously, then accumulates its gradient in $TD(n)$ fashion, using the global target to predict the last state value as DQN does. The overall algorithm is detailed in algorithm \ref{async-n-step-alg}:
 
 \begin{algorithm}[H]
 	\SetAlgoLined
@@ -239,7 +239,50 @@ N-step Q learning has several advantages over DQN.
 	\item Exploration - several agents explore different regions of the environment concurrently, improving convergence.
 	\item Future reward - DQN makes updates based on the immediate reward only. Here the agent collect n rewards and update each decision many times. 
 \end{enumerate}
-\cite{dai17-tsp-s2v} changed  a little bit the DQN algorithm, in order that it will immitate the 
+
+\section{S2V-DQN}
+Combinatorial problems like shortest path, which we can say that \textit{a sub-solution of the optimal solution is also the optimal solution for the appropriate sub-problem} are usualy solved by greedy solvers in polinomial time. This property does not hold in our problem of interest - the TSP. The reward in our problem can change extremely in the final step. 
+In order to tackle this challenge, \cite{dai17-tsp-s2v} changed a little bit the DQN algorithm, in order that it will immitate the 3rd feature of n-step Q learning. The agent now plays n steps and receives n rewards just like in algorithm \ref{async-n-step-alg}, lines 10-15. The update for each pair $s,a$ is made according to the following $n$ rewards, and based on the experience replay. In TSP the reward is the tour length and the discount factor is naturally $\gamma = 1$. The modified algorithm is detailed here:
+
+\begin{algorithm}[H]
+	\SetAlgoLined
+	\DontPrintSemicolon
+	\KwResult{$\theta$}
+ 	Initialize replay memory $\mathcal{M}$ to capacity $N$ \\
+	Initialize agent network parameters $\theta$ \\
+	Initialize target network parameters $\theta^- \leftarrow \theta$ \\
+	Set target update period $T_{update}$ \\ 
+	Set global counter $t_{global} = 1$ \\
+	\For{episode 1 to L}{
+		Initialize environment and state $s_0$ \\
+		\For{step t = 1 to T}{
+			select action $a_t$ according to \eqref{dqn-behavior-policy} \\
+			observe reward $r_t$ and new state $s_{t+1}$ \\
+			\If{$t \geq n$}{			
+				$r_{t-n+1}^{(n)} \leftarrow \sum_{i=t-n+1}^t r_i$  \tcp*{accumulate the total reward of the last n steps} 
+				store $<s_{t-n+1}, a_{t-n+1}, r_{t-n+1}^{(n)},s_{t+1}>$ in $\mathcal{M}$ \\
+				sample a random mini-batch $\mathcal{B} \stackrel{i.i.d}{\sim} \mathcal{M}$ \\
+				\For{$<s_j, a_j, r_j^{(n)}, s_{j+n}>$ in $\mathcal{B}$}{
+					$y_j \leftarrow 
+						\begin{dcases}
+					    r_j^{(n)}				& \text{for terminal } s_{j+n} \\
+					    r_j^{(n)} + \gamma\max_{a'}Q(s_{j+n},a';\theta^-) 	&  \text{for non-terminal } s_{j+n}
+						\end{dcases} 
+					$ \tcp*{calculate target}
+					$L_j(\theta) \leftarrow (y_j - Q(s_j,a_j;\theta)^2$ \tcp*{calculate loss} 
+				}
+				perform SGD on $L_j(\theta)$ \\
+			}
+			\If{$t_{global} \mod T_{update} == 0$}{
+				$\theta^- \leftarrow \theta$	\tcp*{update target parameters}		
+			}
+			$t_{global} \leftarrow t_{global} + 1$
+		}
+	} 
+	\caption{S2V-DQN: n-step reward with Experience Replay}
+ 	\label{s2v-dqn-alg}
+\end{algorithm}
+
 
 \bibliography{tsp-rl-report}
 \bibliographystyle{plain}

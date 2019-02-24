@@ -7,7 +7,16 @@
 \usepackage{mathtools}
 \usepackage[final]{graphicx}
 \DeclareMathOperator*{\argmin}{argmin}
+\DeclareMathOperator*{\argmax}{argmax}
 \newcommand*\perm[2][^n]{\prescript{#1\mkern-2.5mu}{}P_{#2}}
+\usepackage{fullpage}
+\usepackage{times}
+\usepackage{fancyhdr}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\newcommand\mycommfont[1]{\footnotesize\ttfamily\textcolor{blue}{#1}}
+\SetCommentSty{mycommfont}
+\usepackage{xcolor}
+
 \begin{document}
 \title{RL Approach for the TSP Problem}
 \author{Avrech Ben-David}
@@ -18,18 +27,22 @@ In this work we review the recent works in this field. Our purpose is to point o
 \section{Introduction}
 The TSP problem is a fundemental NP-hard combinatorial problem with myriad applications in the industry. Recently, many RL approaches were investigated in order to learn an efficient heuristic to solve the TSP problem. A probable reason is that many variations of the TSP problem can be simply formulated in RL terms, saving the costly development time of ad-hoc solvers. 
 
-However, there is still a gap of 10\% in performance between all these approaches and the best known solver \cite{concorde}, Concorde. Concorde has time complexity of $\mathcal{O}(n^22^n)$ in the worst case, but in the average case it solves instances of thousands of cities to optimality in minutes. The main weakness of Concorde is that it able to solve only the symmetric TSP. 
+However, when testing the generalization ability, there is still a gap of approximately 10\% in performance between all these approaches and the best known solver \cite{concorde}, Concorde. Concorde has time complexity of $\mathcal{O}(n^22^n)$ in the worst case, but in the average case it solves instances of thousands of cities to optimality in minutes. The main weakness of Concorde is that it able to solve only the symmetric TSP. 
 
-There is already a success in applying RL to NP-hard combinatorial problems, but the common characteristic of all these 'solved' problems is that they are all \textit{n-choose-k}-like problems. \cite{dai17-tsp-s2v} solve MVC, SCP and MAXCUT to 1\% from the optimal, generalize well and consume much less computation resources than competitive solutions. However, they fail in the TSP. Other works, \cite{bello16-tsp-pnac} and \cite{deudon18-tsp-nr2opt}, use Pointer Network to solve the TSP. All these works solve the instance they were trained on plausibly, but the fail to generalize to larger instances. While \cite{dai17-tsp-s2v} maintain an approximation ratio of 1.1 on a large scale of graphs, the others fail to generalize to more than 100 nodes. 
+There is already a success in applying RL to NP-hard combinatorial problems (MVC, SCP, MAXCUT - see \cite{dai17-tsp-s2v}), but the common characteristic of all these 'solved' problems is that they are all \textit{n-choose-k}-like problems. \cite{dai17-tsp-s2v} solve MVC, SCP and MAXCUT to 1\% from the optimal, generalize well and consume much less computation resources than competitive solutions. However, they fail in the TSP. Other works, \cite{bello16-tsp-pnac} and \cite{deudon18-tsp-nr2opt}, use Pointer Networks to solve the TSP. All these works solve the instance they were trained on plausibly, but they fail to generalize to larger instances. While \cite{dai17-tsp-s2v} maintain an approximation ratio of 1.1 on a large scale of graphs (up to 1K nodes), the others fail to generalize to more than 100 nodes. 
 
 In this work we follow \cite{dai17-tsp-s2v}, investigating their weaknesses, in order to predict a probably good improvement.
 
 \section{Related Work}
-\cite{bello16-tsp-pnac} were the train locomotive in using Pointer Networks to parameterize a stochastic policy of selecting nodes into the TSP solution. They proposed the common RL formulation for the TSP; the state is the current partial solution - an ordered list of nodes; the action is appending a node to the end of the tour; and the reward is ???. They trained LSTM-based pointer network with policy gradient method (REINFORCE and Actor-Critic) to predict a sequence of nodes one by one. They used Monte-Carlo estimator for the reward signal as it is the natural choice for the TSP, where the total reward can extremely change in the final step, when the loop is closed. Their architecture is limited to fully-connected graphs in the 2D Euclidean space, and requires a long training time. They fail in handling large instances (more than 100 nodes).
+\cite{bello16-tsp-pnac} were the train locomotive in using Pointer Networks to parameterize a stochastic policy of selecting nodes into the TSP solution. They proposed the common RL formulation for the TSP; the state is the current partial solution - an ordered list of nodes; the action is appending a node to the end of the tour; and the reward is the final tour length. They parameterized the target policy by LSTM-based pointer network, and trained it with REINFORCE-Actor-Critic, to predict a sequence of nodes one by one. They used Monte-Carlo estimator for the reward signal as it is the natural choice for the TSP, where the total reward can extremely change in the final step. Their architecture is limited to fully-connected graphs in the 2D Euclidean space, and requires a long training time. They fail in handling large instances (more than 100 nodes).
 
-\cite{deudon18-tsp-nr2opt}, following \cite{bello16-tsp-pnac}, replaced the LSTMs with feed forward components, leaving the pointing mechanism as is. The decoder, composed of a pipeline of 3 stages, explicitely forgets after three steps. The other RL setting remained the same. Obviously, this simplified implementation achieved poor performance by its own, and for this they used 2opt, a local search algorithm to refine the solution. At the bottom line, the improved the performance of \cite{bello16-tsp-pnac} insignificantly, while reducing the model size and the training time dramatically. Anyway, the suffer from the same poor generalization, and the inference time become very long on large graphs due to the 2opt search.
+\cite{deudon18-tsp-nr2opt}, following \cite{bello16-tsp-pnac}, replaced the LSTMs with feed forward components, leaving the pointing mechanism as is. The decoder, composed of a pipeline of 3 stages, explicitely forgets after three steps. The other RL settings remained the same. Obviously, this simplified implementation achieved poor performance by its own, and for this they used 2opt, a local search algorithm to refine the solution. At the bottom line, they improved the performance of \cite{bello16-tsp-pnac} insignificantly, while reducing the model size and the training time dramatically. Anyway, they suffer from the same poor generalization, and the inference time become very long on large graphs due to the 2opt search.
 
-A completely different approach was proposed by \cite{dai17-tsp-s2v}. They used S2V \cite{dai16-s2v} to represent the graph nodes, and learned a Q-function over these features. They trained the network end to end, via n-step Q-learning. Their state is the current partial solution, the action is inserting a node to the partial solution such that the increase in the total length is minimal. The reward is simply the negative increase in the tour length. Their architecture can easily handle any graph structure, and maintain performance on much larger graphs than it was trained on. The main problem is that the Q-function averages the nodes features, throwing away the information of the nodes order. This problem can be viewed in the order the network selects nodes to the partial solution. The network was probably planned to address the mentioned \textit{n-choose-k}-like problems, which are insensitive to the nodes prediction order.
+A completely different approach was proposed by \cite{dai17-tsp-s2v}. They used S2V \cite{dai16-s2v} to represent the graph nodes, and learned a Q-function over these features. They trained the network end to end, via a so called n-step-DQN algorithm (see alg below). Their state is the current partial solution, the action is inserting a node to the partial solution such that the increase in the total length is minimal. The reward is the negative increase in the tour length after taking the action. Their architecture can easily handle any graph structure, and maintain performance on much larger graphs than it was trained on. 
+
+The first and repairable problem is that the Q-function averages the nodes features, throwing away the information of the nodes order. This problem can be viewed in the order the network selects nodes to the partial solution. The network was probably planned to address the mentioned \textit{n-choose-k}-like problems, which are insensitive to the nodes prediction order.
+
+The second and more problematic issue is the reward definition. It is not clear if even n-step reward is good enough to evaluate an action quality. As mentioned, the TSP solution cost can extremely grow in the final step, when closing the loop.
 
 Following, in Section 3 we describe the solution in detail. First we define the RL formulation for the TSP. Next we give an introduction to the network components. The training process is explained in section 4. We detail our experimental setup and results in section 5. In section 6 we discuss our findings, and offer a future work. Conclusions are summarized in Section 7.
 
@@ -38,7 +51,7 @@ Following, in Section 3 we describe the solution in detail. First we define the 
 The traveling salesman problem is: given a graph $G(V,E)$, find the visiting order, such that every node in $V$ is visited exactly once, and the total length of the circular tour is minimal. Representing the graph nodes as a list: $V = \{1,2,3,...,n\}$, the TSP solution $S$ is a permutation of $V$, such that:
 
 \begin{equation} \label{tsp_statement}
-	S = \argmin_{s \in P(V)} C(S)
+	S = \argmin_{s \in Perm(V)} C(S)
 \end{equation}
 
 Where $C(S)$ is the TSP cost function - i.e. the tour length:
@@ -47,38 +60,109 @@ Where $C(S)$ is the TSP cost function - i.e. the tour length:
 	C(S) := \mathlarger{\sum}_{i=1}^{|S|}{distance(s_i, s_{i+1})} + distance(s_{|S|}, s_1)
 \end{equation}
 
-In the classic TSP, the $distance(\cdot,\cdot)$ can be any metric that preserve the triangle inequality. Here we deal only with the Euclidean distance. Note that the flexibility of RL frameworks allow to use any metric to calculate the reward, according to the problem characteristics.
+In the classic TSP, the $distance(\cdot,\cdot)$ can be any metric that preserve the triangle inequality. Here we deal only with the 2D Euclidean distance. 
 
 \section{TSP RL Formulation}	
-The TSP problem naturally lands to the RL standard formulation, mainly because the final $reward$ is well defined in the TSP statement itself. 
-\cite{dai17-tsp-s2v} use fitted Q-Learning framework. The MDP is defined as follows:
+The TSP naturally lands to the RL standard formulation, mainly because the final $reward$ is well defined in the TSP statement itself. 
+\cite{dai17-tsp-s2v} use DQN with \textit{experience replay} with n-step reward (see alg below). The MDP is defined as follows:
 \begin{list}{}{}
-	\item[•] State $S(k)$ - An ordered sequence of $k$ selected nodes $\in \perm[n]{k}$, representing the current partial solution.
-	\item[•] Action $a(v)$ - Adding a node $v \not\in S(k)$ to the partial solution, and placing it greedily to minimize the increase in the $C(S)$. This comes with the transition from state $S$ to $S'$.
-	\item[•] Reward $r(S,a)$ - The change in the cost function, after taking action $a$ in the state $S$ and transitioning to state $S'$, i.e. $C(S')-C(S)$
+	\item[•] State $s_t$ - An ordered sequence of $t$ selected nodes $\in \perm[n]{t}$, representing the current partial solution. The environment is initialized with empty solution $s_0 = \{\}$.
+	\item[•] Action $a_t(v)$ - Adding a node $v \not\in S(k)$ to the partial solution, and placing it greedily to minimize the increase in the tour length $C(S)$. Adding a node inherently defines the transition from state $s_t$ to $s_{t+1}$.
+	\item[•] Reward $r(s_t,a_t)$ - The change in the cost function, after taking action $a_t$ in the state $s_t$ and transitioning to state $s_{t+1}$, i.e. $C(s_{t+1})-C(s_t)$. The accumulated reward over $n$ steps $r_t^{(n)}$ is the total increase $C(s_{t+n})-C(s_t)$. The final reward of an episode is the total tour length $C(s_{|V|})$
 \end{list}
 
-The cummulative $reward$ of the terminal state $\hat{S}$ concides exactly to the objective function, i.e. the total tour length:
-Actually, we use the negative reward, so maximizing the reward is correlative minimizing the tour length.
 
-\subsection{Q-Learning}
+\subsection{Q Network}
 We follow S2V paradigm of approximating the State-Action value function.
-Designing the $Q(S,a)$ function is the main task of us. S2V-DQN uses a permutation invariant function, in the manner that it summes the partial solution nodes features. Probably it was designed at first for permutation-agnostic problems, such as MVC.
+Designing the $Q$ function is our main task. S2V-DQN uses a permutation invariant function, in the meaning that it averages the graph nodes features. Probably it was designed at first for permutation-agnostic problems, such as MVC. Our desired is a $Q$ function that is sensitive to the visiting order of the nodes, but must not overfit to specific input order. 
 
-The desired $Q$ function has to be sensitive to the visiting order of the nodes, but must not overfit to specific input order. 
+\cite{dai17-tsp-s2v} propose the following parameterization for $Q(s,a)$:
+First, at the begining of every state, we update the S2V embeddings, by running $T$ iterations of massage passing:
+\begin{equation}
+	\mu_v^{(t+1)} \leftarrow Relu\Bigg(\theta_1 x_v + \theta_2 \sum_{u \in \mathcal{N}(v)} \mu_u^{(t)} + \theta_3 \sum_{u \in \mathcal{N}(v)} Relu\big(\theta_4 w(v,u)\big)\Bigg)
+\end{equation}
 
-\cite{bello16-tsp-pnac} designed Pointer Network to learn a policy using policy gradient and actor-critic method. They also used MC estimator instead of TD(n). Pointer Network looks a natural choice to solve the TSP problem. The intuition behind using Monte Carlo for the TSP problem is that it captures the total tour length. TSP is not like common combinatorial problems (e.g. shortest path), where a partial solution is also the optimal solution for the corresponding reduced problem. So making greedy decisions might cost a lot at the end.
- 
-There are several works that follow \cite{bello16-tsp-pnac}, however, they do not show better performance. 
-A partial list: \\
+After embedding the current state $s_t$, we use $\widehat{Q}(s,a;\theta)$ to predict the value of an optional action:
+\begin{equation}
+	\widehat{Q}(s,a;\theta) = \theta_5^\top Relu(concat(\theta_6 \sum_{v \in V} \mu_v^{(T)}, \theta_7 \mu_a^{(T)}))
+\end{equation}
 
-\cite{deudon18-tsp-nr2opt}, PN-AC-solver for ATSP\footnote{https://github.com/MichelDeudon/neural-combinatorial-optimization-rl-tensorflow}  \\
+\subsection{Q Learning}
+We use here a modified DQN algorithm. In the basic DQN we use the same Q architecture for the $\varepsilon-greedy$ behavior policy $\pi_b(a|s)$ and the $greedy$ target policy $\pi^*(a|s)$.
 
-Decision version of TSP, use graph-embedding like S2V followed by PN-AC.
+\begin{equation}
+\pi^*(a|s) = \argmax_{a \notin s}{Q^*(s,a;\theta^-)}
+\label{dqn-target-policy}
+\end{equation}
+
+\begin{equation}
+\pi_b(a|s) = 
+\begin{dcases}
+    random \ {a \notin s} 					& \text{w.p  \ \ } \varepsilon \\
+    \argmax_{a \notin s}{Q(s,a;\theta)} 	& \text{otherwise}
+\end{dcases}
+\label{dqn-behavior-policy}
+\end{equation}
+We use the behavior policy, parameterized by $\theta$ to select an action $a_t$ for the current state $s_t$, and the target policy, parameterized by $\theta^-$ for estimating the DQN target, originally defined as:
+\begin{equation}
+y_t = r_t + \gamma\max_{a'}Q(s_{t+1},a';\theta^-)
+\label{orig-dqn-target}
+\end{equation}
+The only modification is that we use the sum of the following $n$ rewards $r_t^{(n)} = \sum_{i=0}^{n-1} r_{t+i}$, and after that bootstrap using the target policy \eqref{dqn-target-policy}:
+\begin{equation}
+y_t = r_t^{(n)} + \gamma\max_{a'}Q(s_{t+n},a';\theta^-)
+\label{s2vdqn_target}
+\end{equation}
+The objective function at step $t$ is the squared error between the target and the learned $Q$ function:
+\begin{equation}
+L_t(\theta) = (y_t - Q(s_t,a_t;\theta)^2
+\label{dqn_objective}
+\end{equation}
+We can now optimize this loss w.r.t $\theta$ using SGD. In order to reduce the updates variance, DQN use an \textit{experience-replay}. We retroactivelly store each state-action pair with its following accumulated rewards, and the resultant state $<s_t, a_t, r_t^{(n)}, s_{t+n}>$ in a replay memory $\mathcal{M}$. At each update we sample a batch of examples $\mathcal{B} ~^{i.i.d} \mathcal{M}$ and make a more stable update of $\theta$. The target parameters $\theta^-$ are updated every certain number of steps by $\theta$ to prevent chase after a moving target.
+
+The learning process is detailed in algorithm \eqref{s2v-dqn-alg}.
 
 
+\begin{algorithm}[H]
+	\SetAlgoLined
+	\DontPrintSemicolon
+	\KwResult{$\theta$}
+ 	Initialize replay memory $\mathcal{M}$ to capacity $N$ \\
+	Initialize agent network parameters $\theta$ \\
+	Initialize target network parameters $\theta^- \leftarrow \theta$ \\
+	Set target update period $T_{update}$ \\ 
+	Set global counter $t_{global} = 1$ \\
+	\For{episode 1 to L}{
+		Initialize environment and state $s_0$ \\
+		\For{step t = 1 to T}{
+			select action $a_t$ according to \eqref{dqn-behavior-policy} \\
+			observe reward $r_t$ and new state $s_{t+1}$ \\
+			\If{$t \geq n$}{			
+				$r_{t-n+1}^{(n)} \leftarrow \sum_{i=t-n+1}^t r_i$  \tcp*{accumulate the total reward of the last n steps} 
+				store $<s_{t-n+1}, a_{t-n+1}, r_{t-n+1}^{(n)},s_{t+1}>$ in $\mathcal{M}$ \\
+				sample a random mini-batch $\mathcal{B} \stackrel{i.i.d}{\sim} \mathcal{M}$ \\
+				\For{$<s_j, a_j, r_j^{(n)}, s_{j+n}>$ in $\mathcal{B}$}{
+					$y_j \leftarrow 
+						\begin{dcases}
+					    r_j^{(n)}				& \text{for terminal } s_{j+n} \\
+					    r_j^{(n)} + \gamma\max_{a'}Q(s_{j+n},a';\theta^-) 	&  \text{for non-terminal } s_{j+n}
+						\end{dcases} 
+					$ \tcp*{calculate target}
+					$L_j(\theta) \leftarrow (y_j - Q(s_j,a_j;\theta)^2$ \tcp*{calculate loss} 
+				}
+				perform SGD on $L_j(\theta)$ \\
+			}
+			\If{$t_{global} \mod T_{update} == 0$}{
+				$\theta^- \leftarrow \theta$	\tcp*{update target parameters}		
+			}
+			$t_{global} \leftarrow t_{global} + 1$
+		}
+	} 
+	\caption{S2V-DQN: n-step reward with Experience Replay}
+ 	\label{s2v-dqn-alg}
+\end{algorithm}
 
-
+Now we can conceptually optimize our network end-to-end.
 
 \section{Experiments}
 	The Concorde\footnote{https://github.com/jvkersch/pyconcorde} algorithm was used as the optimal solution, which the following approximation ratio and execution time ratio are related to. As a baseline model we took the cross-entropy method\footnote{https://github.com/v-iashin/CrossEntropyTSP}
