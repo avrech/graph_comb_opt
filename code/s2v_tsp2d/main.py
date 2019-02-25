@@ -95,8 +95,8 @@ if __name__ == '__main__':
         api.lib.PlayGame(100, ctypes.c_double(1.0))
     api.TakeSnapshot()
 
-    eps_start = float(opt['epsilon_start'])
-    eps_end = float(opt['epsilon_end'])
+    eps_start = float(opt['epsilon_greedy_start'])
+    eps_end = float(opt['epsilon_greedy_end'])
 
     eps_step = 10000.0
     api.lib.SetSign(1)

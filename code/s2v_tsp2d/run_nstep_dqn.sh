@@ -15,9 +15,10 @@ dev_id=1
 batch_size=128
 
 net_type=QNet
-decay=0.99 # gamma - discount factor
-epsilon_start=1
-epsilon_end=0.01
+decay=0.1 # gamma - discount factor
+epsilon_greedy_start=1
+epsilon_greedy_end=1
+
 # set reg_hidden=0 to make a linear regression
 reg_hidden=32
 
