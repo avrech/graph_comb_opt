@@ -6,7 +6,7 @@ import ctypes
 import os
 import sys
 from tqdm import tqdm
-
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append( '%s/tsp2d_lib' % os.path.dirname(os.path.realpath(__file__)) )
 from tsp2d_lib import Tsp2dLib
 
