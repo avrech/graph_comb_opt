@@ -15,8 +15,9 @@ dev_id=1
 batch_size=128
 
 net_type=QNet
-decay=0.1
-
+decay=0.99 # gamma - discount factor
+epsilon_start=1
+epsilon_end=0.01
 # set reg_hidden=0 to make a linear regression
 reg_hidden=32
 
@@ -37,10 +38,10 @@ max_n=50
 num_env=1
 mem_size=50000
 
-max_iter=100000
+max_iter=200000
 
 # folder to save the trained model
-result_root=results/dqn-$g_type-$min_n-$max_n-nstep-$n_step
+result_root=results/dqn-$g_type-$min_n-$max_n-nstep-$n_step-gamma-$decay
 
 save_dir=$result_root/ntype-$net_type-embed-$embed_dim-nbp-$max_bp_iter-rh-$reg_hidden
 
@@ -54,6 +55,8 @@ python main.py \
     -n_step $n_step \
     -data_root ../../data/tsp2d \
     -decay $decay \
+    -epsilon_start $epsilon_start \
+    -epsilon_end $epsilon_end \
     -knn $knn \
     -min_n $min_n \
     -max_n $max_n \
