@@ -5,6 +5,7 @@ import random
 import ctypes
 import os
 import sys
+import time
 from tqdm import tqdm
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append( '%s/tsp2d_lib' % os.path.dirname(os.path.realpath(__file__)) )
@@ -102,7 +103,9 @@ if __name__ == '__main__':
     api.lib.SetSign(1)
 
     lr = float(opt['learning_rate'])
-    learning_curve = []
+    learning_curve, eps_decay, lr_decay = [], [], []
+    start_t = time.time()
+    iter_start_t = time.time()
     for iter in range(int(opt['max_iter'])):
         eps = eps_end + max(0., (eps_start - eps_end) * (eps_step - iter) / eps_step)
         if iter % 10 == 0:
@@ -112,8 +115,15 @@ if __name__ == '__main__':
             frac = 0.0
             for idx in range(n_valid):
                 frac += api.lib.Test(idx)
-            print 'iter', iter, 'lr', lr, 'eps', eps, 'average tour length: ', frac / n_valid
+            print('iter: {6d} |lr: {:.7f} |eps: {:.2f} |average tour length: {:.6f} |time" {:.2f}[min]'.format(iter,
+                                                                                                     lr,
+                                                                                                     eps,
+                                                                                                     frac / n_valid,
+                                                                                                     (time.time() - iter_start_t) / 60))
+            iter_start_t = time.time()
             learning_curve.append([iter, frac / n_valid])
+            eps_decay.append(eps)
+            lr_decay.append(lr)
             sys.stdout.flush()
             model_path = '%s/nrange_%d_%d_iter_%d.model' % (opt['save_dir'], int(opt['min_n']), int(opt['max_n']), iter)
             api.SaveModel(model_path)
@@ -123,6 +133,7 @@ if __name__ == '__main__':
             lr = lr * 0.95
 
         api.lib.Fit(ctypes.c_double(lr))
-    with open(os.path.join(opt['save_dir'],'learning_curve.pkl'), 'w') as f:
-        pickle.dump(learning_curve)
-    print('learning_curve stored in ', os.path.join(opt['save_dir'],'learning_curve.pkl'))
+    total_time = (time.time() - start_t) / 60 # minutes
+    with open(os.path.join(opt['save_dir'],'stats.pkl'), 'w') as f:
+        pickle.dump((learning_curve, eps_decay, lr_decay, total_time))
+    print('(learning_curve, eps_decay, lr_decay and total_time) stored in ', os.path.join(opt['save_dir'],'learning_curve.pkl'))
