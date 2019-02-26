@@ -9,7 +9,7 @@ from tqdm import tqdm
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append( '%s/tsp2d_lib' % os.path.dirname(os.path.realpath(__file__)) )
 from tsp2d_lib import Tsp2dLib
-
+import pickle
 n_valid = 100
 
 def find_model_file(opt):
@@ -102,6 +102,7 @@ if __name__ == '__main__':
     api.lib.SetSign(1)
 
     lr = float(opt['learning_rate'])
+    learning_curve = []
     for iter in range(int(opt['max_iter'])):
         eps = eps_end + max(0., (eps_start - eps_end) * (eps_step - iter) / eps_step)
         if iter % 10 == 0:
@@ -112,6 +113,7 @@ if __name__ == '__main__':
             for idx in range(n_valid):
                 frac += api.lib.Test(idx)
             print 'iter', iter, 'lr', lr, 'eps', eps, 'average tour length: ', frac / n_valid
+            learning_curve.append([iter, frac / n_valid])
             sys.stdout.flush()
             model_path = '%s/nrange_%d_%d_iter_%d.model' % (opt['save_dir'], int(opt['min_n']), int(opt['max_n']), iter)
             api.SaveModel(model_path)
@@ -121,3 +123,6 @@ if __name__ == '__main__':
             lr = lr * 0.95
 
         api.lib.Fit(ctypes.c_double(lr))
+    with open(os.path.join(opt['save_dir'],'learning_curve.pkl'), 'w') as f:
+        pickle.dump(learning_curve)
+    print('learning_curve stored in ', os.path.join(opt['save_dir'],'learning_curve.pkl'))
