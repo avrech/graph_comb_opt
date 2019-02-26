@@ -58,8 +58,8 @@ for l2 in "${l2_lambdas[@]}"; do
 
                     knn=10
 
-                    min_n=40
-                    max_n=50
+                    min_n=15
+                    max_n=20
 
                     num_env=1
                     mem_size=50000
