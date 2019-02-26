@@ -115,7 +115,7 @@ if __name__ == '__main__':
             frac = 0.0
             for idx in range(n_valid):
                 frac += api.lib.Test(idx)
-            print('iter: {6d} |lr: {:.7f} |eps: {:.2f} |average tour length: {:.6f} |time" {:.2f}[min]'.format(iter,
+            print('iter: {:6} |lr: {:.7f} |eps: {:.2f} |average tour length: {:.6f} |time" {:.2f}[min]'.format(iter,
                                                                                                      lr,
                                                                                                      eps,
                                                                                                      frac / n_valid,
