@@ -17,6 +17,12 @@
 \SetCommentSty{mycommfont}
 \usepackage{xcolor}
 
+\usepackage{csvsimple}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{pgfplotstable}
+\pgfplotsset{compat=1.9}% supress warning
+
 \begin{document}
 \title{RL Approach for the TSP Problem}
 \author{Avrech Ben-David}
@@ -44,9 +50,9 @@ The first and repairable problem is that the Q-function averages the nodes featu
 
 The second and more problematic issue is the reward definition. It is not clear if even n-step reward is good enough to evaluate an action quality. As mentioned, the TSP solution cost can extremely grow in the final step, when closing the loop.
 
-Following, in Section 3 we describe the solution in detail. First we define the RL formulation for the TSP. Next we give an introduction to the network components. The training process is explained in section 4. We detail our experimental setup and results in section 5. In section 6 we discuss our findings, and offer a future work. Conclusions are summarized in Section 7.
+Following, in Section \ref{sec-methodology} we describe the solution in detail. First we define the RL formulation for the TSP. Next we give an introduction to the network components. The training process is explained in Section \ref{sec-training}. We detail our experimental setup and results in Section \ref{sec-experiments}. In Section \ref{sec-conclusions} we discuss our findings, and highlights the weaker elements in this work. Finally we offer a future work in Section \ref{sec-roadmap}.
 
-\section{Methodology}
+\section{Methodology} \label{sec-methodology}
 \subsection{Problem Statement}
 The traveling salesman problem is: given a graph $G(V,E)$, find the visiting order, such that every node in $V$ is visited exactly once, and the total length of the circular tour is minimal. Representing the graph nodes as a list: $V = \{1,2,3,...,n\}$, the TSP solution $S$ is a permutation of $V$, such that:
 
@@ -80,11 +86,13 @@ Designing the $Q$ function is our main task. S2V-DQN uses a permutation invarian
 First, at the begining of every state, we update the S2V embeddings, by running $T$ iterations of massage passing:
 \begin{equation}
 	\mu_v^{(t+1)} \leftarrow Relu\Bigg(\theta_1 x_v + \theta_2 \sum_{u \in \mathcal{N}(v)} \mu_u^{(t)} + \theta_3 \sum_{u \in \mathcal{N}(v)} Relu\big(\theta_4 w(v,u)\big)\Bigg)
+		\label{s2v-dqn-nodes-features}
 \end{equation}
 
 After embedding the current state $s_t$, we use $\widehat{Q}(s,a;\theta)$ to predict the value of an optional action:
 \begin{equation}
-	\widehat{Q}(s,a;\theta) = \theta_5^\top Relu(concat(\theta_6 \sum_{v \in V} \mu_v^{(T)}, \theta_7 \mu_a^{(T)}))
+	Q(s,a;\theta) = \theta_5^\top Relu\bigg(concat\big(\theta_6 \sum_{v \in V} \mu_v^{(T)}, \theta_7 \mu_a^{(T)}\big)\bigg)
+	\label{s2v-dqn-qfunc}
 \end{equation}
 
 \subsection{Q Learning}
@@ -115,7 +123,7 @@ y_t = r_t^{(n)} + \gamma\max_{a'}Q(s_{t+n},a';\theta^-)
 \end{equation}
 The objective function at step $t$ is the squared error between the target and the learned $Q$ function:
 \begin{equation}
-L_t(\theta) = (y_t - Q(s_t,a_t;\theta)^2
+L_t(\theta) = \big(y_t - Q(s_t,a_t;\theta)\big)^2
 \label{dqn_objective}
 \end{equation}
 We can now optimize this loss w.r.t $\theta$ using SGD. In order to reduce the updates variance, DQN use an \textit{experience-replay}. We retroactivelly store each state-action pair with its following accumulated rewards, and the resultant state $<s_t, a_t, r_t^{(n)}, s_{t+n}>$ in a replay memory $\mathcal{M}$. At each update we sample a batch of examples $\mathcal{B} ~^{i.i.d} \mathcal{M}$ and make a more stable update of $\theta$. The target parameters $\theta^-$ are updated every certain number of steps by $\theta$ to prevent chase after a moving target.
@@ -138,17 +146,17 @@ The learning process is detailed in algorithm \eqref{s2v-dqn-alg}.
 			select action $a_t$ according to \eqref{dqn-behavior-policy} \\
 			observe reward $r_t$ and new state $s_{t+1}$ \\
 			\If{$t \geq n$}{			
-				$r_{t-n+1}^{(n)} \leftarrow \sum_{i=t-n+1}^t r_i$  \tcp*{accumulate the total reward of the last n steps} 
+				$r_{t-n+1}^{(n)} \leftarrow \mathlarger{\sum}_{i=0}^{n-1} \gamma^i r_{t-n+1+i}$  \tcp*{last n-steps reward} 
 				store $<s_{t-n+1}, a_{t-n+1}, r_{t-n+1}^{(n)},s_{t+1}>$ in $\mathcal{M}$ \\
 				sample a random mini-batch $\mathcal{B} \stackrel{i.i.d}{\sim} \mathcal{M}$ \\
 				\For{$<s_j, a_j, r_j^{(n)}, s_{j+n}>$ in $\mathcal{B}$}{
 					$y_j \leftarrow 
 						\begin{dcases}
 					    r_j^{(n)}				& \text{for terminal } s_{j+n} \\
-					    r_j^{(n)} + \gamma\max_{a'}Q(s_{j+n},a';\theta^-) 	&  \text{for non-terminal } s_{j+n}
+					    r_j^{(n)} + \gamma^n \max_{a'}Q(s_{j+n},a';\theta^-) 	&  \text{for non-terminal } s_{j+n}
 						\end{dcases} 
 					$ \tcp*{calculate target}
-					$L_j(\theta) \leftarrow (y_j - Q(s_j,a_j;\theta)^2$ \tcp*{calculate loss} 
+					$L_j(\theta) \leftarrow \big(y_j - Q(s_j,a_j;\theta)\big)^2$ \tcp*{calculate loss} 
 				}
 				perform SGD on $L_j(\theta)$ \\
 			}
@@ -164,26 +172,29 @@ The learning process is detailed in algorithm \eqref{s2v-dqn-alg}.
 
 Now we can conceptually optimize our network end-to-end.
 
-\section{Training Setup}
-The training process is actually as follows:
+\section{Training Setup} \label{sec-training}
+The network parameterization details are as in \cite{dai17-tsp-s2v}, and only the hyper-parameters were changed. Apart of the original setup: $\gamma=0.1, \varepsilon \equiv 1, l2=0$ and \textit{n-step} $=1$, we further experimented with a large scale of these parameters, in order to understand the network behavior. In spite of the competitive performance of the network, comparing to other works, the original parameters values do not make sense, and the authors do not supply convincing explanation.
 
-
+The training process is as follows:
 \begin{list}{•}{•}
 	\item Training starts with 1000 exploration episodes with $\varepsilon = 1$
-	\item $\varepsilon \equiv 1$
-	\item Update target every $T_{update} = 1000$ episodes
-	\item Decay learning rate by 0.95 every 1000 episodes
+	\item The target parameters are updated every 1000 behavior updates
+	\item $\varepsilon1$ is decayed almost linearly from a specified initial value, to a constant final value
+	\item The learning rate is multiplied by 0.95 every 1000 behavior updates
+	\item The network is evaluated every 100 episodes on a held-out validation set, and the parameters are stored with the average tour length
+	\item The final parameters are selected to minimize the validation average tour length
 \end{list}
-TODO: COMPLETE
 
+\section{Experiments} \label{sec-experiments}
+\subsection{Baselines}	
+We use Concorde\footnote{https://github.com/jvkersch/pyconcorde} to compute the optimal solution. We report approximation ratio and execution time ratio comparing to the optimal solution. The ratio is defined as $\dfrac{Model_{performance}}{Concorde_{performance}} $ so as the ratio is closer to 1 the tested model is better.
+As an on-the-shelf algorithm, we used cross-entropy method\footnote{https://github.com/v-iashin/CrossEntropyTSP}, note that it certainly emphasises the necessity of smart solver.
+We trained and evaluated the network of \cite{deudon18-tsp-nr2opt}, which we refer to as nr2opt, using their original data generator. We compared the generalization ability of nr2opt to S2V-DQN, and show that S2V-DQN outperforms \cite{deudon18-tsp-nr2opt} even in case it was trained on much smaller graphs and on different data distribution.
 
-
-\section{Experiments}
-	The Concorde\footnote{https://github.com/jvkersch/pyconcorde} algorithm was used as the optimal solution, which the following approximation ratio and execution time ratio are related to. As a baseline model we took the cross-entropy method\footnote{https://github.com/v-iashin/CrossEntropyTSP}
-\subsection{Realworld Data - Experimental Setup}
-	The results below refer to the Tsplib dataset\footnote{http://dimacs.rutgers.edu/Challenges/TSP/}. The dataset contains 38 cities of 51-318 nodes each one.
-	The S2V model in this experiment was trained for 100,000 epochs on a single sample (berlin52). 
-	Table \ref{tb_tsplib_performance_s2v_vs_ce} shows the averaged approximation and time ratio of S2V over the entire data-set. The ratio is defined as $\dfrac{S2V_{performance}}{Concorde_{performance}} $ so as the ratio is closer to 1 the S2V works better.
+\subsection{Realworld Data - Experimental Setup} \label{realworld-exp}
+The results below refer to the Tsplib dataset\footnote{http://dimacs.rutgers.edu/Challenges/TSP/}. The dataset contains 38 cities of 51-318 nodes each one.
+In this experiment	S2V-DQN was trained for 100,000 epochs on a single sample (berlin52). We used the original network hyper-parameters.
+Table \ref{tb_tsplib_performance_s2v_vs_ce} shows the approximation ratio per execution time ratio of S2V-DQN comparing to cross-entropy method. The cross-entopy method was too slowly on larger graphs, and anyway, we find it sufficient to report onlt this small sample of cities.
 	
 	\begin{table}[h] \centering
 	\begin{tabular}{lll}
@@ -193,44 +204,130 @@ TODO: COMPLETE
 		st70 			& 1.065@1.56 	& 1.17@16666 			\\
 		eil76			& 1.066@3.45 	& 1.12@31000
 	\end{tabular}
-	\caption{Tsplib Small Cities Approximation Ratio vs Time} 
+	\caption{Tsplib Small Cities Approximation Ratio per Time Ratio} 
 	\label{tb_tsplib_performance_s2v_vs_ce}
+	\small S2V-DQN trained on berlin52 for 100,000 epochs. The logic behind training S2V-DQN on a single instance\footnote{This was the answer I got for why did they trained the model on a single city only.} is demonstrating the ability of S2V-DQN to solve TSP as an out-of-the-box solver, exactly as we use cross-entropy method as an on-the-shelf solver. The cross-entropy methods takes 11 minutes to solve 52 nodes, and it seems like it grows exponentially.
 	\end{table}
-	This experiment demonstrates the ability of S2V to solve an instance as an out-of-the-box solver\footnote{This was the answer I got for why did they trained the model on a single city only.}. 
-	
-	Additional experiments with traditional setting are detailed below. I did not evaluated the cross-entropy method on larger graphs than 80 nodes, because it becomes extremely slow. It takes around 11 minutes to solve a graph of 52 nodes, and it seems like it grows exponentially.
-	
+
+ 
 
 \subsection{Synthetic Data Experiment}
-In this experiment the network is trained on synthetic dataset\footnote{https://www.dropbox.com/sh/r39596h8e26nhsp/AADRm5mb82xn7h3BB4KXgETsa?dl=0}, consist of either clustered or uniformly distributed graphs.
-I trained the network on 1000 graphs of 15-20 and 50-100 nodes. Table \ref{tb_tsp2d_performance_s2v} lists the achieved performance. 
+In order to understand the contribution of the training set to the test results, we trained S2V-DQN on a synthetic dataset\footnote{https://www.dropbox.com/sh/r39596h8e26nhsp/AADRm5mb82xn7h3BB4KXgETsa?dl=0}, consists of either clustered or uniformly distributed graphs. The model was trained on 1000 graphs of 15-20 nodes. We observed that the performance is the same as if we trained the network on a single instance as in section \ref{realworld-exp}. The average approximation ratio over the entire Tsplib dataset was 1.092, and the execution time ratio was 0.91. It seems that this performance level really reflects the S2V architecture expressiveness. We assert this declaration in an exhaustive experiment as described in section \ref{exhaustive-search-exp}.
 
-\begin{table}[h] \centering
-	\begin{tabular}{lll}
-	 	Trained on		& Approximation @ Time Method 	\\
-	 	15-20	 		& 1.092@0.91					\\
-		50-100			& - 
-	\end{tabular}
-	\caption{Performance of S2V on TspLib for Different Train-set Size} 
-	\label{tb_tsp2d_performance_s2v}
+\subsection{Exhaustive Search Experiment} \label{exhaustive-search-exp}
+\cite{dai17-tsp-s2v} reported weired hyper-parameters selection, which arises questions about the model ability to learn the TSP. The original parameter-set was $\{\gamma=1, \varepsilon=1 \text{(without decay at all)}, l2=0, nstep=1\}$. $\gamma=1$ defines almost totaly greedy policy, regardless of the tracked \textit{n-steps}, and explicitely does not fit the TSP nature. 
+
+In order to understand the model weaknesses better, we performed an exhaustive search on a large scale of parameters and evaluated the model on a slightly different data distribution. S2V-DQN was trained on synthetic clustered graphs in $[0,1]^2$, and evaluated on uniformly distributed graphs of 100 and 200 nodes supplied by \cite{deudon18-tsp-nr2opt}.
+
+We also compared the results to \texttt{nr\_only}, the pointer network proposed by \cite{deudon18-tsp-nr2opt}, trained from scratch using it's original setup. S2V-DQN outperforms \cite{deudon18-tsp-nr2opt} even "in their home". Following,  \texttt{nr\_only} and \texttt{nr2opt} refer to the pointer network alone, and to the setup which it is followed by 2opt refinement.
+
+\begin{table}[]
+\centering
+\begin{tabular}{@{}llllllll@{}}
+\toprule
+Model           & Trained on          & Nstep      & $\gamma$     & $\varepsilon$   & l2            & Approximation  & Time            \\ \midrule
+\textbf{nr2opt} & \textbf{50}         & \textbf{-} & \textbf{-}   & \textbf{-}      & \textbf{-}    & \textbf{1.061} & \textbf{18.826} \\
+\textbf{S2V}    & \textbf{rand-40-50} & \textbf{1} & \textbf{0.1} & \textbf{1-to-1} & \textbf{0.00} & \textbf{1.081} & \textbf{1.070}  \\
+S2V             & clus-15-20          & 5          & 0.9          & 1-to-0.1        & 0.00          & 1.084          & 1.102           \\
+S2V             & clus-15-20          & 4          & 0.9          & 1-to-1          & 0.00          & 1.084          & 1.154           \\
+S2V             & clus-15-20          & 5          & 0.9          & 1-to-1          & 0.00          & 1.084          & 1.118           \\
+S2V             & clus-15-20          & 7          & 0.1          & 1-to-0.1        & 0.0001        & 1.085          & 1.115           \\
+S2V             & clus-15-20          & 2          & 0.9          & 1-to-0.1        & 0.00          & 1.085          & 1.030           \\
+S2V             & clus-15-20          & 4          & 0.9          & 1-to-0.1        & 0.00          & 1.085          & 1.005           \\
+S2V             & clus-15-20          & 3          & 0.9          & 1-to-1          & 0.00          & 1.085          & 1.012           \\
+S2V             & clus-15-20          & 4          & 0.9          & 1-to-1          & 0.0001        & 1.086          & 1.121           \\
+S2V             & clus-15-20          & 3          & 0.9          & 1-to-0.1        & 0.00          & 1.086          & 1.104           \\
+S2V             & clus-15-20          & 2          & 1            & 1-to-0.1        & 0.0001        & 1.087          & 1.010           \\
+S2V             & clus-15-20          & 3          & 0.1          & 1-to-1          & 0.00          & 1.087          & 0.971           \\
+S2V             & clus-15-20          & 2          & 0.9          & 1-to-0.1        & 0.0001        & 1.089          & 1.051           \\
+S2V             & clus-15-20          & 2          & 1            & 1-to-1          & 0.0001        & 1.089          & 1.028           \\
+S2V             & clus-15-20          & 3          & 0.1          & 1-to-1          & 0.0001        & 1.090          & 1.082           \\
+S2V             & clus-40-50          & 3          & 1            & 1-to-0.01       & 0.00          & 1.094          & 1.280           \\
+S2V             & clus-40-50          & 6          & 1            & 1-to-0.01       & 0.00          & 1.096          & 1.053           \\
+S2V             & clus-15-20          & 3          & 0.9          & 1-to-1          & 0.0001        & 1.100          & 1.013           \\
+S2V             & clus-15-20          & 4          & 1            & 1-to-1          & 0.0001        & 1.115          & 1.076           \\
+S2V             & clus-15-20          & 4          & 0.9          & 1-to-0.1        & 0.0001        & 1.123          & 1.018           \\
+S2V             & clus-15-20          & 7          & 1            & 1-to-0.1        & 0.0001        & 1.126          & 1.108           \\
+S2V             & clus-15-20          & 7          & 0.9          & 1-to-0.1        & 0.0001        & 1.128          & 0.960           \\
+S2V             & clus-15-20          & 4          & 1            & 1-to-0.1        & 0.0001        & 1.138          & 1.033           \\
+nr\_only        & 50                  & -          & -            & -               & -             & 1.175          & 0.778           \\ \bottomrule
+\end{tabular}
+\caption{Exhaustive Search Results on Random Graphs of 100 Nodes}
+\label{exhastive-search-results100}
+\end{table}
+    
+% Please add the following required packages to your document preamble:
+% \usepackage{booktabs}
+\begin{table}[]
+\centering
+\begin{tabular}{@{}llllllll@{}}
+\toprule
+\textbf{Model} & \textbf{Trained on} & \textbf{Nstep} & \textbf{gamma} & \textbf{epsilon} & \textbf{l2} & \textbf{Approx} & \textbf{Time} \\ \midrule
+\textbf{S2V} & \textbf{rand-40-50} & \textbf{1} & \textbf{0.1} & \textbf{1-to-1} & \textbf{0.00} & \textbf{1.095} & \textbf{0.825} \\
+S2V & clus-15-20 & 4 & 0.9 & 1-to-1 & 0.00 & 1.098 & 0.816 \\
+S2V & clus-15-20 & 7 & 0.1 & 1-to-0.1 & 0.0001 & 1.099 & 0.836 \\
+S2V & clus-15-20 & 2 & 1 & 1-to-1 & 0.0001 & 1.100 & 0.827 \\
+S2V & clus-15-20 & 2 & 0.9 & 1-to-0.1 & 0.0001 & 1.100 & 0.794 \\
+S2V & clus-15-20 & 2 & 1 & 1-to-0.1 & 0.0001 & 1.100 & 0.902 \\
+S2V & clus-15-20 & 3 & 0.9 & 1-to-0.1 & 0.00 & 1.100 & 0.817 \\
+S2V & clus-15-20 & 4 & 0.9 & 1-to-0.1 & 0.00 & 1.101 & 0.872 \\
+S2V & clus-15-20 & 2 & 0.9 & 1-to-0.1 & 0.00 & 1.103 & 0.786 \\
+S2V & clus-40-50 & 3 & 1 & 1-to-0.01 & 0.00 & 1.103 & 0.853 \\
+S2V & clus-40-50 & 6 & 1 & 1-to-0.01 & 0.00 & 1.104 & 0.805 \\
+S2V & clus-15-20 & 4 & 0.9 & 1-to-1 & 0.0001 & 1.104 & 0.828 \\
+S2V & clus-15-20 & 3 & 0.1 & 1-to-1 & 0.00 & 1.104 & 0.818 \\
+S2V & clus-15-20 & 3 & 0.1 & 1-to-1 & 0.0001 & 1.105 & 0.819 \\
+S2V & clus-15-20 & 3 & 0.9 & 1-to-1 & 0.0001 & 1.123 & 0.762 \\
+S2V & clus-15-20 & 4 & 0.9 & 1-to-0.1 & 0.0001 & 1.134 & 0.768 \\
+S2V & clus-15-20 & 7 & 1 & 1-to-0.1 & 0.0001 & 1.135 & 0.805 \\
+S2V & clus-15-20 & 4 & 1 & 1-to-1 & 0.0001 & 1.141 & 0.758 \\
+S2V & clus-15-20 & 4 & 1 & 1-to-0.1 & 0.0001 & 1.158 & 0.837 \\
+S2V & clus-15-20 & 7 & 0.9 & 1-to-0.1 & 0.0001 & 1.176 & 0.792 \\
+nr2opt & 50 & - & - & - & - & 1.571 & 0.879 \\
+nr\_only & 50 & - & - & - & - & 1.602 & 0.392 \\ \bottomrule
+\end{tabular}
+\caption{Exhaustive Search Results on Random Graphs of 200 Nodes}
+\label{exhastive-search-results200}
 \end{table}
 
-There is no significant improvement upon training on a single sample. It seems that this performance level really reflects the S2V architecture expressiveness.
+Tables \ref{exhastive-search-results100} and \ref{exhastive-search-results200} lists the parameters grid search. Note that \texttt{nr\_only} by itself has poor peformance, and \texttt{nr2opt} execution time is much higher that Concorde. On 200 nodes \cite{deudon18-tsp-nr2opt} is out of the game. The results assert that the original S2V-DQN parameters of \cite{dai17-tsp-s2v} are the best choice. it strengthens the hypothesis that either the architecture or the reward estimation do not fit the TSP.
+
+\subsection{Results from the Original Paper}
+Figure \ref{im_paper_aprx_comp} gives an overview of the existing approaches, due to 2016. For more analyses and approximation-time trade-off refer to \cite{dai17-tsp-s2v}. There is no heuristic that generalizes better than S2V-DQN, and all of them are bounded to 9-10\% from the optimal. The performance do not improve if we train S2V-DQN on large graphs, as can be depicted from figure \ref{im_paper_aprx_vs_trainsize}.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1\textwidth]{tsp_paper_res_comp.eps}	
+	\medskip
+	\caption{Comparison of Existing Approaches to the TSP}
+	\small On large instances S2V-DQN is not better than others in terms of approximation ratio.
+	\label{im_paper_aprx_comp}
+\end{figure}
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1\textwidth]{tsp_paper_res_table.eps}
+	\caption{S2V-DQN Generalization as function of Training Graphs Size}
+	\small No matter how much you train, the approximation ratio remains the same.
+	\medskip
+	\label{im_paper_aprx_vs_trainsize}
+\end{figure}	
+
 	
+\section{Conclusions} \label{sec-conclusions}
+The authors explained the fact that S2V did not show impressive performance on the TSP problem in that the tested graphs are fully-connected. The graph structure is less important, and even "graph-agnostic" methods achieve the same performance. This answers why other proposals show comparable results to S2V-DQN, but it does not answer why all of the results degrades with the graph size.
 
+We highlight two important weaknesses: 1. The Q netowrk architecture, 2. The reward estimation.
+1. The S2V-DQN architecture has a built-in disadvantage regarding sequence mapping. Averageing the nodes features in \ref{s2v-dqn-qfunc} ignores the state essential information about the current tour. Originally, the nodes features were summed  in order to be invariant to permutations. It works well on MVC and probably on any other ${n \choose k}$-like problem.
 
-\section{The Authors Explanation}
-	The authors explained the fact that S2V did not show impressive performance on the TSP problem in that the tested graphs are fully-connected. The graph structure is less important, and even "graph-agnostic" methods achieve the same performance. 
-	Actually, the TSP problem was not widely investigated in the paper relative to the other problems.
+2. Actually, S2V-DQN performs its best when configured to learn a completely greedy policy. Setting $\gamma=0.1$ actually ignored the delayed reward, and makes the \textit{n-step} property useless. The fact that setting high values of $\gamma$ and \textit{n-step} do not show improvement can derive from two reasons:
+The first is that \textit{n-step} learning might not be sufficient in the TSP, because the reward can dramatically change in the last steps of an episode. Moreover, using the negative increase in tour as the immediate reward biases the policy to greedy steps. It is certainly the easy way to define the reward but it absolutely contradicts the TSP intuition.
 
-\section{My Conclusions}
-	This work does not show outstanding performance on the TSP problem. The authors argue that it is because of the tested graphs are fully-connected, so that the 'graph structure' importance decreases, and the main advantage of the model doesn't expressed well. Such an argument should be supported in simple test. 
-	
-	I think that the S2V model has a built-in disadvantage regarding sequence mapping. The feedback that the model receivces from the currently constructed solution lacks the essential information about the tour path. The nodes features are summed together (in order to be invariant to permutations). It works well on MVC and probably on any other ${n \choose k}$-like problem, because the solution in such problems do not care of the nodes order. 
-	In addition, some of the model's important properties are degenerated in this experiment, e.g. the n-step Q-learning. They do not give a satisfying intuition to their odd reward function (at least they say that it is a matter for future work).
-	
-	At the bottom-line, the S2V model, as is, do not fit the TSP problem's characteristics. 
+The second is the problematic architecture of $Q(s,a;\theta)$. This is certainly changeable, and there is only one way to assess this hypothesis, testing it.
 
+Another weird setting is the obssession of exploration. Setting $\varepsilon$ to 1 constantly, implies that we do not trust the learned policy at all. Does the learnd policy so arbitrary? If so, why do we spend so much efforts on RL?
+\section{Roadmap} \label{sec-roadmap}
+As a first step we have to implement S2V-DQN in pure Python and restore the original results. It might take 2-3 months. The second step is to change the $Q$ parameterization.
+Further research would investigate the reward estimation, e.g Monte Carlo reward estimator. Other RL methods, say, policy gradient methods, are also an option, but eventually, all of these methods are the same same.
 
 \bibliography{tsp-rl-report}
 \bibliographystyle{plain}

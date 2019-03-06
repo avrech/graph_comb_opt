@@ -6,19 +6,19 @@ l2_lambdas=(
 gammas=(
 #    1
     0.9
-    0.1 #original
+#    0.1 #original
 )
 epsilons_start=(
     1 #original
 )
 epsilons_end=(
-#    0.01
     0.1
-    1 #original
+    0.01
+#    1 #original
 )
 n_steps=(
-    4
-    2 # 1 was the original
+#    5
+    1 # 1 was the original
 )
 for l2 in "${l2_lambdas[@]}"; do
     for decay in "${gammas[@]}"; do

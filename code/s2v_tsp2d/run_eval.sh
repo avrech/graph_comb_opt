@@ -44,8 +44,11 @@ mem_size=50000
 
 max_iter=100000
 
-# folder to save the trained model
+# To evaluate a specific model:
 result_root=results/dqn-$g_type-$min_n-$max_n-nstep-$n_step
+# To test all trained models set 1, else 0
+test_all=1
+
 save_dir=$result_root/ntype-$net_type-embed-$embed_dim-nbp-$max_bp_iter-rh-$reg_hidden
 
 python evaluate.py \
@@ -68,6 +71,7 @@ python evaluate.py \
     -net_type $net_type \
     -max_iter $max_iter \
     -save_dir $save_dir \
+    -test_all $test_all \
     -embed_dim $embed_dim \
     -batch_size $batch_size \
     -reg_hidden $reg_hidden \

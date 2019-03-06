@@ -134,6 +134,7 @@ if __name__ == '__main__':
 
         api.lib.Fit(ctypes.c_double(lr))
     total_time = (time.time() - start_t) / 60 # minutes
+
     with open(os.path.join(opt['save_dir'],'stats.pkl'), 'w') as f:
-        pickle.dump((learning_curve, eps_decay, lr_decay, total_time))
+        pickle.dump((learning_curve, eps_decay, lr_decay, total_time), f)
     print('(learning_curve, eps_decay, lr_decay and total_time) stored in ', os.path.join(opt['save_dir'],'learning_curve.pkl'))
